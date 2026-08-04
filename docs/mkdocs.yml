@@ -1,0 +1,45 @@
+site_name: CDGS — Code Documentation Generation System
+site_description: Automated AI-powered documentation generation for GitHub repositories.
+site_url: https://github.com/SaiEswar002/CDGS_finalyear
+repo_url: https://github.com/SaiEswar002/CDGS_finalyear
+repo_name: SaiEswar002/CDGS_finalyear
+
+docs_dir: docs
+
+theme:
+  name: material
+  palette:
+    scheme: slate
+    primary: indigo
+    accent: deep purple
+  font:
+    text: Inter
+    code: JetBrains Mono
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - search.highlight
+    - content.code.copy
+
+nav:
+  - Home: index.md
+  - Architecture:
+      - Overview: architecture/overview.md
+  - API Reference:
+      - Health: api/health.md
+  - Development:
+      - Getting Started: development/getting-started.md
+      - Environment Variables: development/env-vars.md
+      - Database Schema: development/schema.md
+
+markdown_extensions:
+  - admonition
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - tables
+  - toc:
+      permalink: true

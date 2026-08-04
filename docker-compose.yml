@@ -1,0 +1,55 @@
+version: "3.9"
+
+services:
+  # ── Frontend (Vite dev server) ──────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    environment:
+      - VITE_API_URL=http://localhost:3000
+    depends_on:
+      - backend
+
+  # ── Backend (Express + TypeScript) ─────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    env_file:
+      - .env
+    depends_on:
+      - redis
+
+  # ── Redis ───────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+
+  # ── Worker stub (Phase 3 — not yet functional) ──────────────
+  # worker:
+  #   build:
+  #     context: ./backend
+  #     dockerfile: Dockerfile.dev
+  #   command: echo "Worker stub — BullMQ not yet implemented"
+  #   env_file:
+  #     - .env
+  #   depends_on:
+  #     - redis
+
+volumes:
+  redis_data:

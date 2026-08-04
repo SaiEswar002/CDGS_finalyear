@@ -1,0 +1,14 @@
+{
+  "source": ["src/**/*.ts"],
+  "sourceType": "module",
+  "plugins": ["node", "jsdoc"],
+  "opts": {
+    "destination": "./docs/jsdoc",
+    "recurse": true,
+    "readme": "./README.md"
+  },
+  "templates": {
+    "cleverLinks": false,
+    "monospaceLinks": false
+  }
+}
