@@ -1,19 +1,29 @@
 import { NavLink } from 'react-router-dom'
+import { useAuthStore } from '../../store/authStore'
 
-const NAV_ITEMS = [
+const PUBLIC_LINKS = [
   { to: '/', label: 'Home', id: 'nav-home' },
+] as const
+
+const PROTECTED_LINKS = [
   { to: '/dashboard', label: 'Dashboard', id: 'nav-dashboard' },
+  { to: '/repositories', label: 'Repositories', id: 'nav-repos' },
 ] as const
 
 /**
- * Primary navigation links.
- * Uses React Router's <NavLink> for active state styling.
+ * Primary navigation — shows protected links only when authenticated.
  */
 export default function Nav() {
+  const { isAuthenticated } = useAuthStore()
+
+  const links = isAuthenticated
+    ? [...PUBLIC_LINKS, ...PROTECTED_LINKS]
+    : PUBLIC_LINKS
+
   return (
     <nav aria-label="Primary navigation">
       <ul className="flex items-center gap-1">
-        {NAV_ITEMS.map(({ to, label, id }) => (
+        {links.map(({ to, label, id }) => (
           <li key={to}>
             <NavLink
               to={to}
@@ -32,19 +42,6 @@ export default function Nav() {
             </NavLink>
           </li>
         ))}
-
-        {/* CTA — will route to /auth/login in Phase 2 */}
-        <li className="ml-3">
-          <a
-            href="#"
-            id="nav-signin"
-            className="btn-primary !py-2 !px-4 !text-xs"
-            aria-label="Sign in with GitHub (coming soon)"
-            onClick={(e) => e.preventDefault()}
-          >
-            Sign in with GitHub
-          </a>
-        </li>
       </ul>
     </nav>
   )

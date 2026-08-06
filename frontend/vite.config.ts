@@ -9,9 +9,11 @@ export default defineConfig({
     host: true, // needed for Docker
     proxy: {
       '/api': {
-        target: 'http://backend:3000',
+        // In Docker: backend service. Locally: localhost.
+        target: process.env.VITE_API_URL ?? 'http://127.0.0.1:3000',
         changeOrigin: true,
       },
     },
   },
 })
+

@@ -1,19 +1,25 @@
 import { Router } from 'express'
 import { healthRouter } from './health'
+import { authRouter } from '../auth/auth.router'
+import { repositoriesRouter } from '../repositories/repositories.router'
 
 /**
  * Root API router.
  * Mounted at /api/v1 in app.ts.
- * Add new sub-routers here as phases are implemented.
  *
  * Current routes:
  *   GET  /api/v1/health
+ *   GET  /api/v1/auth/github
+ *   GET  /api/v1/auth/github/callback
+ *   POST /api/v1/auth/logout
+ *   GET  /api/v1/auth/me
+ *   POST /api/v1/repositories
+ *   GET  /api/v1/repositories
+ *   GET  /api/v1/repositories/:id
+ *   DELETE /api/v1/repositories/:id
  */
 export const apiRouter = Router()
 
 apiRouter.use('/health', healthRouter)
-
-// Phase 2+: mount more sub-routers here
-// apiRouter.use('/auth',  authRouter)
-// apiRouter.use('/repos', reposRouter)
-// apiRouter.use('/runs',  runsRouter)
+apiRouter.use('/auth', authRouter)
+apiRouter.use('/repositories', repositoriesRouter)

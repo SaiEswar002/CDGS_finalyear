@@ -1,34 +1,57 @@
+import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
+import { api } from '../lib/api'
+import { useAuthStore } from '../store/authStore'
+import type { Repository } from '../components/RepositoryCard'
+
+interface StatsData {
+  repos: number
+}
+
 /**
- * DashboardPage — Phase 1 placeholder.
- *
- * This route exists to prove routing works end-to-end.
- * Real dashboard content (repos, jobs, doc versions) is a later phase.
+ * DashboardPage — /dashboard (protected)
+ * Shows summary stats and quick links.
  */
 export default function DashboardPage() {
+  const { user } = useAuthStore()
+  const [stats, setStats] = useState<StatsData>({ repos: 0 })
+  const [loadingStats, setLoadingStats] = useState(true)
+
+  useEffect(() => {
+    api
+      .get<{ success: boolean; data: { repositories: Repository[]; count: number } }>(
+        '/repositories',
+      )
+      .then((res) => setStats({ repos: res.data.data.count }))
+      .catch(() => setStats({ repos: 0 }))
+      .finally(() => setLoadingStats(false))
+  }, [])
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 animate-slide-up">
-      {/* Page header */}
+      {/* Welcome */}
       <div className="mb-10">
-        <div className="flex items-center gap-3 mb-2">
-          <span className="badge-green">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse-slow" />
-            Route active
+        <h1 className="text-4xl font-extrabold text-slate-100 mb-2">
+          Welcome back,{' '}
+          <span className="text-gradient">
+            {user?.githubName ?? user?.githubLogin ?? 'there'}
           </span>
-        </div>
-        <h1 className="text-4xl font-extrabold text-slate-100 mb-3">
-          Dashboard
         </h1>
-        <p className="text-slate-400 max-w-xl">
-          Routing is working correctly. This placeholder will become the
-          main dashboard once GitHub OAuth and repository management are
-          implemented in later phases.
+        <p className="text-slate-400">
+          Here&apos;s an overview of your CDGS workspace.
         </p>
       </div>
 
-      {/* Placeholder cards grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 mb-10">
+      {/* Stats */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 mb-10">
         {[
-          { label: 'Repositories', value: '—', icon: '📁', note: 'Phase 2' },
+          {
+            label: 'Repositories',
+            value: loadingStats ? '…' : String(stats.repos),
+            icon: '📁',
+            link: '/repositories',
+            linkLabel: 'Manage',
+          },
           { label: 'Doc Runs', value: '—', icon: '⚙️', note: 'Phase 3' },
           { label: 'AI Tokens Used', value: '—', icon: '🧠', note: 'Phase 4' },
         ].map((stat) => (
@@ -37,29 +60,61 @@ export default function DashboardPage() {
               <span className="text-2xl" role="img" aria-label={stat.label}>
                 {stat.icon}
               </span>
-              <span className="text-xs font-mono text-slate-500 bg-white/5 px-2 py-1 rounded-md">
-                {stat.note}
-              </span>
+              {'note' in stat && stat.note && (
+                <span className="text-xs font-mono text-slate-500 bg-white/5 px-2 py-1 rounded-md">
+                  {stat.note}
+                </span>
+              )}
             </div>
             <p className="text-3xl font-bold text-slate-300 mb-1">{stat.value}</p>
-            <p className="text-sm text-slate-500">{stat.label}</p>
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-slate-500">{stat.label}</p>
+              {'link' in stat && stat.link && (
+                <Link
+                  to={stat.link}
+                  className="text-xs text-brand-400 hover:text-brand-300 transition-colors font-medium"
+                >
+                  {stat.linkLabel} →
+                </Link>
+              )}
+            </div>
           </div>
         ))}
       </div>
 
-      {/* Coming soon callout */}
-      <div className="glass-card p-8 border-dashed border-white/10 text-center">
-        <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-brand-600/15 border border-brand-500/20
-                        flex items-center justify-center text-3xl">
-          🚧
+      {/* Quick actions */}
+      <div className="glass-card p-8">
+        <h2 className="text-lg font-semibold text-slate-200 mb-5">Quick Actions</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Link
+            to="/repositories"
+            id="dashboard-manage-repos"
+            className="flex items-center gap-4 p-5 rounded-xl border border-white/8
+                       hover:bg-brand-600/8 hover:border-brand-500/30 transition-all duration-200 group"
+          >
+            <span className="text-2xl">📁</span>
+            <div>
+              <p className="font-semibold text-slate-200 group-hover:text-brand-300 transition-colors">
+                Manage Repositories
+              </p>
+              <p className="text-sm text-slate-500">Import and connect GitHub repos</p>
+            </div>
+          </Link>
+          <Link
+            to="/profile"
+            id="dashboard-profile"
+            className="flex items-center gap-4 p-5 rounded-xl border border-white/8
+                       hover:bg-white/5 hover:border-white/15 transition-all duration-200 group"
+          >
+            <span className="text-2xl">👤</span>
+            <div>
+              <p className="font-semibold text-slate-200 group-hover:text-slate-100 transition-colors">
+                Your Profile
+              </p>
+              <p className="text-sm text-slate-500">View account details</p>
+            </div>
+          </Link>
         </div>
-        <h2 className="text-xl font-semibold text-slate-200 mb-2">
-          Dashboard under construction
-        </h2>
-        <p className="text-slate-400 text-sm max-w-sm mx-auto">
-          Connect your GitHub account, add repositories, and trigger doc generation
-          — all coming in Phases 2–4.
-        </p>
       </div>
     </div>
   )

@@ -2,27 +2,35 @@ import { type Request, type Response, type NextFunction } from 'express'
 import { logger } from '../logger'
 
 /**
- * Standard API response shape for errors.
+ * Standard API error response shape (Phase 2 spec).
  *
  * @example
  * ```json
  * {
  *   "success": false,
- *   "error": {
- *     "code": "VALIDATION_ERROR",
- *     "message": "Request body is invalid",
- *     "details": [...]
- *   }
+ *   "message": "Authentication failed.",
+ *   "errors": []
  * }
  * ```
  */
-export interface ApiError {
+export interface ApiErrorResponse {
   success: false
-  error: {
-    code: string
-    message: string
-    details?: unknown
-  }
+  message: string
+  errors: Array<{ path?: string; message: string }>
+}
+
+/**
+ * Standard API success response shape.
+ *
+ * @example
+ * ```json
+ * { "success": true, "message": "Repository imported successfully.", "data": {} }
+ * ```
+ */
+export interface ApiSuccessResponse<T = unknown> {
+  success: true
+  message: string
+  data: T
 }
 
 /**
@@ -32,6 +40,7 @@ export interface ApiError {
  * @example
  * ```ts
  * throw new HttpError(404, 'NOT_FOUND', 'Repository not found')
+ * throw new HttpError(400, 'VALIDATION_ERROR', 'Invalid input', [{ path: 'name', message: 'required' }])
  * ```
  */
 export class HttpError extends Error {
@@ -39,7 +48,7 @@ export class HttpError extends Error {
     public readonly statusCode: number,
     public readonly code: string,
     message: string,
-    public readonly details?: unknown,
+    public readonly errors: Array<{ path?: string; message: string }> = [],
   ) {
     super(message)
     this.name = 'HttpError'
@@ -51,9 +60,11 @@ export class HttpError extends Error {
  * Must be the last `app.use()` call in app.ts.
  *
  * Handles:
- * - `HttpError` instances (operational errors)
- * - Zod validation errors (forwarded by validate middleware)
- * - Unknown errors (returns 500)
+ * - `HttpError` — operational errors with known status codes
+ * - Unknown errors — returns 500
+ *
+ * All errors are returned in the standard Phase 2 response shape:
+ * `{ success: false, message, errors }`
  */
 export function errorHandler(
   err: unknown,
@@ -63,30 +74,28 @@ export function errorHandler(
   _next: NextFunction,
 ): void {
   if (err instanceof HttpError) {
-    logger.warn({ code: err.code, status: err.statusCode }, err.message)
+    logger.warn(
+      { code: err.code, status: err.statusCode },
+      err.message,
+    )
 
-    const body: ApiError = {
+    const body: ApiErrorResponse = {
       success: false,
-      error: {
-        code: err.code,
-        message: err.message,
-        ...(err.details !== undefined ? { details: err.details } : {}),
-      },
+      message: err.message,
+      errors: err.errors,
     }
 
     res.status(err.statusCode).json(body)
     return
   }
 
-  // Unexpected / programmer errors — log full stack in dev
+  // Unexpected / programmer errors
   logger.error({ err }, 'Unhandled error')
 
-  const body: ApiError = {
+  const body: ApiErrorResponse = {
     success: false,
-    error: {
-      code: 'INTERNAL_SERVER_ERROR',
-      message: 'An unexpected error occurred',
-    },
+    message: 'An unexpected error occurred.',
+    errors: [],
   }
 
   res.status(500).json(body)

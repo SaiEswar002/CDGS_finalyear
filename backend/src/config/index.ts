@@ -1,4 +1,10 @@
+import path from 'path'
+import dotenv from 'dotenv'
 import { z } from 'zod'
+
+// Load .env from cwd or parent root directory
+dotenv.config()
+dotenv.config({ path: path.resolve(process.cwd(), '../.env') })
 
 /**
  * Zod schema for all environment variables.
@@ -21,19 +27,37 @@ const envSchema = z.object({
   // Redis
   REDIS_URL: z.string().default('redis://localhost:6379'),
 
-  // Auth
+  // Auth — JWT
   JWT_SECRET: z.string().min(32, 'JWT_SECRET must be at least 32 characters'),
+  JWT_EXPIRES_IN: z.string().default('7d'),
 
-  // GitHub OAuth (required from config, used in later phases)
-  GITHUB_CLIENT_ID: z.string().default(''),
-  GITHUB_CLIENT_SECRET: z.string().default(''),
+  // Auth — Cookie signing secret
+  COOKIE_SECRET: z
+    .string()
+    .min(32, 'COOKIE_SECRET must be at least 32 characters'),
+
+  // Auth — AES-256-GCM encryption key for GitHub tokens
+  // Must be exactly 64 hex chars = 32 bytes.
+  // Generate: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+  ENCRYPTION_KEY: z
+    .string()
+    .regex(
+      /^[0-9a-f]{64}$/i,
+      'ENCRYPTION_KEY must be exactly 64 hex characters (32 bytes)',
+    ),
+
+  // GitHub OAuth
+  GITHUB_CLIENT_ID: z.string().min(1, 'GITHUB_CLIENT_ID is required'),
+  GITHUB_CLIENT_SECRET: z
+    .string()
+    .min(1, 'GITHUB_CLIENT_SECRET is required'),
   GITHUB_WEBHOOK_SECRET: z.string().default(''),
 
   // AI Providers (used in later phases)
   OPENAI_API_KEY: z.string().default(''),
   ANTHROPIC_API_KEY: z.string().default(''),
 
-  // CORS
+  // CORS / Frontend
   FRONTEND_URL: z.string().default('http://localhost:5173'),
 
   // Logging
@@ -71,6 +95,7 @@ export const config = {
   port: parseInt(parsed.PORT, 10),
   nodeEnv: parsed.NODE_ENV,
   isProduction: parsed.NODE_ENV === 'production',
+  isTest: parsed.NODE_ENV === 'test',
 
   supabase: {
     url: parsed.SUPABASE_URL,
@@ -84,12 +109,21 @@ export const config = {
 
   auth: {
     jwtSecret: parsed.JWT_SECRET,
+    jwtExpiresIn: parsed.JWT_EXPIRES_IN,
+    cookieSecret: parsed.COOKIE_SECRET,
+    /** Raw 32-byte Buffer derived from the 64-char hex ENCRYPTION_KEY */
+    encryptionKey: Buffer.from(parsed.ENCRYPTION_KEY, 'hex'),
   },
 
   github: {
     clientId: parsed.GITHUB_CLIENT_ID,
     clientSecret: parsed.GITHUB_CLIENT_SECRET,
     webhookSecret: parsed.GITHUB_WEBHOOK_SECRET,
+    /** OAuth scopes — least privilege, do not expand */
+    scopes: 'read:user user:email repo',
+    authorizeUrl: 'https://github.com/login/oauth/authorize',
+    tokenUrl: 'https://github.com/login/oauth/access_token',
+    apiBase: 'https://api.github.com',
   },
 
   ai: {
