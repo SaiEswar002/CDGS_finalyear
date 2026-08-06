@@ -5,7 +5,8 @@ import { useAuthStore } from '../store/authStore'
 import type { Repository } from '../components/RepositoryCard'
 
 interface StatsData {
-  repos: number
+  connectedRepos: number
+  githubRepos: number | null
 }
 
 /**
@@ -14,17 +15,26 @@ interface StatsData {
  */
 export default function DashboardPage() {
   const { user } = useAuthStore()
-  const [stats, setStats] = useState<StatsData>({ repos: 0 })
-  const [loadingStats, setLoadingStats] = useState(true)
+  const [stats, setStats] = useState<StatsData>({ connectedRepos: 0, githubRepos: null })
+  const [loadingConnected, setLoadingConnected] = useState(true)
+  const [loadingGitHub, setLoadingGitHub] = useState(true)
 
   useEffect(() => {
+    // Fetch CDGS connected repos count
     api
       .get<{ success: boolean; data: { repositories: Repository[]; count: number } }>(
         '/repositories',
       )
-      .then((res) => setStats({ repos: res.data.data.count }))
-      .catch(() => setStats({ repos: 0 }))
-      .finally(() => setLoadingStats(false))
+      .then((res) => setStats((prev) => ({ ...prev, connectedRepos: res.data.data.count })))
+      .catch(() => setStats((prev) => ({ ...prev, connectedRepos: 0 })))
+      .finally(() => setLoadingConnected(false))
+
+    // Fetch total GitHub repos count from user's account
+    api
+      .get<{ success: boolean; data: { repos: { id: number }[] } }>('/github/repos')
+      .then((res) => setStats((prev) => ({ ...prev, githubRepos: res.data.data.repos.length })))
+      .catch(() => setStats((prev) => ({ ...prev, githubRepos: 0 })))
+      .finally(() => setLoadingGitHub(false))
   }, [])
 
   return (
@@ -43,14 +53,21 @@ export default function DashboardPage() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 mb-10">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-10">
         {[
           {
-            label: 'Repositories',
-            value: loadingStats ? '…' : String(stats.repos),
+            label: 'Connected Repos',
+            value: loadingConnected ? '…' : String(stats.connectedRepos),
             icon: '📁',
             link: '/repositories',
             linkLabel: 'Manage',
+          },
+          {
+            label: 'Total GitHub Repos',
+            value: loadingGitHub ? '…' : String(stats.githubRepos ?? 0),
+            icon: '🐙',
+            link: '/repositories',
+            linkLabel: 'Import',
           },
           { label: 'Doc Runs', value: '—', icon: '⚙️', note: 'Phase 3' },
           { label: 'AI Tokens Used', value: '—', icon: '🧠', note: 'Phase 4' },
