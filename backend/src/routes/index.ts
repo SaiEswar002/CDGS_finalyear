@@ -2,6 +2,7 @@ import { Router } from 'express'
 import { healthRouter } from './health'
 import { authRouter } from '../auth/auth.router'
 import { repositoriesRouter } from '../repositories/repositories.router'
+import { githubRouter } from '../github/github.router'
 
 /**
  * Root API router.
@@ -13,6 +14,7 @@ import { repositoriesRouter } from '../repositories/repositories.router'
  *   GET  /api/v1/auth/github/callback
  *   POST /api/v1/auth/logout
  *   GET  /api/v1/auth/me
+ *   GET  /api/v1/github/repos
  *   POST /api/v1/repositories
  *   GET  /api/v1/repositories
  *   GET  /api/v1/repositories/:id
@@ -22,4 +24,6 @@ export const apiRouter = Router()
 
 apiRouter.use('/health', healthRouter)
 apiRouter.use('/auth', authRouter)
+apiRouter.use('/github', githubRouter)
 apiRouter.use('/repositories', repositoriesRouter)
+
