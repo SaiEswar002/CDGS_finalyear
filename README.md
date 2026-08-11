@@ -10,8 +10,8 @@
 |---|---|
 | Phase 1: Foundation (React + Express + TS + Pino + Zod + Supabase) | ✅ Complete |
 | Phase 2: Auth & Repo Import (GitHub OAuth + Token Encryption + File Tree + Commits + Reader) | ✅ Complete |
-| Phase 3: Webhooks, Job Queue (BullMQ/Redis), Git Clone/Diff, AI Doc Engine | ⏳ Phase 3 |
-| Phase 4: Documentation Versioning & Public Portal | ⏳ Phase 4 |
+| Phase 3: Automatic Change Detection (Pipeline Service, Database Schema 003, Shared Contracts, Dashboard UI) | 🚀 Phase 3 Active (Integration/Pipeline Complete) |
+| Phase 4: AI Generation Engine & Public Portal | ⏳ Phase 4 |
 
 📖 **For Team Setup & Module Development Guide, see [TEAM_SETUP_GUIDE.md](TEAM_SETUP_GUIDE.md).**
 
@@ -41,13 +41,13 @@ cp .env.example .env
 # Edit .env and fill in your Supabase URL, keys, etc.
 ```
 
-### 3. Apply the database schema
+### 3. Apply database migrations
 
-In your Supabase project → **SQL Editor**, run:
+In your Supabase project → **SQL Editor**, run the migration files in order:
 
-```bash
-# Paste contents of db/schema.sql and execute
-```
+1. `db/schema.sql` (Phase 1 core schema)
+2. `db/migrations/002_phase2_auth.sql` (Phase 2 OAuth & repo columns)
+3. `db/migrations/003_phase3_pipeline.sql` (Phase 3 pipeline runs & stage logs)
 
 ### 4. Run with Docker Compose (recommended)
 
@@ -92,25 +92,30 @@ CDGS_finalyear/
 ├── .env.example          # All required env vars (copy to .env)
 ├── docker-compose.yml    # All services
 ├── db/
-│   └── schema.sql        # 10-table Supabase schema
+│   ├── schema.sql        # Core Supabase schema
+│   └── migrations/       # Incremental SQL migrations (002_auth, 003_pipeline)
 ├── docs/                 # MkDocs documentation source
 ├── frontend/             # React + Vite + Tailwind app
 │   └── src/
-│       ├── components/   # Reusable UI components
-│       └── pages/        # Route-level pages
+│       ├── components/   # Reusable UI components (FileViewerModal, PipelineRunsTable, etc.)
+│       └── pages/        # Route-level pages (DashboardPage, RepositoryDetailPage, etc.)
 └── backend/              # Express + TypeScript API
     └── src/
-        ├── config/       # Env var loader
+        ├── auth/         # GitHub OAuth, JWT, & Cookie auth
+        ├── config/       # Typed env var loader
         ├── db/           # Supabase client
+        ├── github/       # Centralized GitHub REST API client
         ├── logger/       # Pino logger
-        ├── middleware/   # Error handler, validation
-        ├── routes/       # API route handlers
+        ├── middleware/   # Error handler, validation, authentication
+        ├── pipeline/     # Phase 3 Pipeline Service, contracts, & endpoints
+        ├── repositories/ # Repository management API
+        ├── routes/       # Central API route index
         └── swagger/      # Swagger/OpenAPI config
 ```
 
 ---
 
-## API
+## API Reference
 
 All routes are prefixed `/api/v1/`.
 
@@ -118,6 +123,13 @@ All routes are prefixed `/api/v1/`.
 |---|---|---|
 | `GET` | `/api/v1/health` | Health check |
 | `GET` | `/api/v1/docs` | Swagger UI |
+| `GET` | `/api/v1/auth/github` | Trigger GitHub OAuth login |
+| `GET` | `/api/v1/auth/me` | Get current authenticated user |
+| `GET` | `/api/v1/repositories` | List connected repositories |
+| `GET` | `/api/v1/repositories/:id` | Repository details, commit history & tree |
+| `GET` | `/api/v1/repositories/:id/file` | Read raw file contents from GitHub |
+| `GET` | `/api/v1/pipeline-runs` | List Phase 3 pipeline runs |
+| `GET` | `/api/v1/pipeline-runs/:id` | Get pipeline run details & stage logs |
 
 ---
 
