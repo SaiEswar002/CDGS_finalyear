@@ -6,7 +6,7 @@ export interface PipelineRunItem {
   commit_sha: string
   branch: string
   status: 'queued' | 'running' | 'success' | 'failed' | 'retrying'
-  current_stage: 'webhook' | 'clone' | 'diff'
+  current_stage: 'webhook' | 'clone' | 'diff' | 'docgen' | 'ai' | 'publish'
   duration_ms: number | null
   created_at: string
   repository?: {

@@ -25,7 +25,7 @@ export const createPipelineRunBodySchema = z.object({
 /** Validation schema for POST /api/v1/pipeline-runs/stage */
 export const updateStageBodySchema = z.object({
   runId: z.string().uuid('Invalid run ID'),
-  stage: z.enum(['webhook', 'clone', 'diff']),
+  stage: z.enum(['webhook', 'clone', 'diff', 'docgen', 'ai', 'publish']),
   status: z.enum(['queued', 'running', 'success', 'failed', 'retrying']),
   errorMessage: z.string().optional(),
   retryCount: z.number().int().min(0).optional(),

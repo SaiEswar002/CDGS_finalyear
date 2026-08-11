@@ -1,0 +1,154 @@
+import type { Request, Response } from 'express'
+import { verifyGitHubSignature } from './webhook.crypto'
+import type { GitHubPushPayload } from './webhook.types'
+import { getSupabaseClient } from '../db/supabaseClient'
+import { createPipelineRun } from '../pipeline/pipeline.service'
+import { enqueuePipelineJob } from '../queue/queue.service'
+import { logger } from '../logger'
+
+/**
+ * POST /api/v1/webhooks/github
+ *
+ * Receives GitHub push events, verifies HMAC signature,
+ * matches the repository to a CDGS-connected repository,
+ * creates a pipeline run, and enqueues a BullMQ job.
+ *
+ * This is Hari's assigned Phase 3 module — implemented here
+ * to enable full end-to-end testing.
+ */
+export async function githubWebhookHandler(req: Request, res: Response): Promise<void> {
+  // 1. Verify X-Hub-Signature-256 (HMAC-SHA256)
+  const signature = req.headers['x-hub-signature-256'] as string | undefined
+  const eventType = req.headers['x-github-event'] as string | undefined
+
+  if (!signature) {
+    logger.warn('Webhook received without X-Hub-Signature-256 header')
+    res.status(401).json({ success: false, error: 'Missing webhook signature' })
+    return
+  }
+
+  // req.body is Buffer because of express.raw() on this route
+  const isValid = verifyGitHubSignature(req.body as Buffer, signature)
+  if (!isValid) {
+    logger.warn({ eventType }, 'Webhook signature verification failed')
+    res.status(401).json({ success: false, error: 'Invalid webhook signature' })
+    return
+  }
+
+  // 2. Parse JSON body from raw Buffer
+  let payload: GitHubPushPayload
+  try {
+    payload = JSON.parse((req.body as Buffer).toString('utf8'))
+  } catch (err) {
+    logger.error({ err }, 'Failed to parse webhook payload JSON')
+    res.status(400).json({ success: false, error: 'Invalid JSON payload' })
+    return
+  }
+
+  // 3. Only process push events
+  if (eventType !== 'push') {
+    logger.info({ eventType }, 'Ignoring non-push webhook event')
+    res.status(200).json({ success: true, message: `Event type '${eventType}' ignored.` })
+    return
+  }
+
+  // 4. Ignore branch deletions (after = 000...000)
+  const NULL_SHA = '0000000000000000000000000000000000000000'
+  if (payload.after === NULL_SHA) {
+    logger.info({ ref: payload.ref }, 'Ignoring branch deletion push event')
+    res.status(200).json({ success: true, message: 'Branch deletion ignored.' })
+    return
+  }
+
+  // 5. Extract branch name from ref (refs/heads/main -> main)
+  const branch = payload.ref.replace('refs/heads/', '')
+  const owner = payload.repository.owner.login
+  const repo = payload.repository.name
+  const githubRepositoryId = payload.repository.id
+  const afterSha = payload.after
+  const beforeSha = payload.before === NULL_SHA ? NULL_SHA : payload.before
+
+  logger.info(
+    { owner, repo, branch, afterSha: afterSha.slice(0, 7), beforeSha: beforeSha.slice(0, 7) },
+    'Received GitHub push event',
+  )
+
+  // 6. Look up connected repository in CDGS database
+  const supabase = getSupabaseClient()
+  const { data: repoRecord, error: repoErr } = await supabase
+    .from('repositories')
+    .select('id, user_id, full_name')
+    .eq('github_id', githubRepositoryId)
+    .maybeSingle()
+
+  if (repoErr) {
+    logger.error({ err: repoErr, githubRepositoryId }, 'Database error looking up repository')
+    res.status(500).json({ success: false, error: 'Database error' })
+    return
+  }
+
+  if (!repoRecord) {
+    logger.info(
+      { owner, repo, githubRepositoryId },
+      'Push event received for repository not connected to CDGS — ignoring',
+    )
+    res.status(200).json({ success: true, message: 'Repository not connected to CDGS.' })
+    return
+  }
+
+  // 7. Create pipeline run (idempotent — returns existing run if already queued/running)
+  let pipelineRun
+  try {
+    pipelineRun = await createPipelineRun({
+      repositoryId: repoRecord.id,
+      commitSha: afterSha,
+      beforeSha,
+      branch,
+      triggeredBy: repoRecord.user_id,
+      triggerType: 'webhook',
+    })
+  } catch (err: any) {
+    logger.error({ err: err.message, repositoryId: repoRecord.id }, 'Failed to create pipeline run')
+    res.status(500).json({ success: false, error: 'Failed to create pipeline run' })
+    return
+  }
+
+  // 8. Enqueue BullMQ job (jobId = pipelineRunId for canonical identity)
+  try {
+    await enqueuePipelineJob({
+      pipelineRunId: pipelineRun.id,
+      repositoryId: repoRecord.id,
+      githubRepositoryId,
+      owner,
+      repo,
+      branch,
+      beforeSha,
+      afterSha,
+    })
+  } catch (err: any) {
+    logger.error({ err: err.message, pipelineRunId: pipelineRun.id }, 'Failed to enqueue pipeline job')
+    // Don't fail the webhook — run was created, can be retried
+    res.status(202).json({
+      success: true,
+      message: 'Pipeline run created but job queuing failed.',
+      data: { pipelineRunId: pipelineRun.id },
+    })
+    return
+  }
+
+  logger.info(
+    { pipelineRunId: pipelineRun.id, owner, repo, branch, afterSha: afterSha.slice(0, 7) },
+    'Pipeline run created and job enqueued from webhook',
+  )
+
+  res.status(202).json({
+    success: true,
+    message: 'Push event received. Pipeline run queued.',
+    data: {
+      pipelineRunId: pipelineRun.id,
+      repositoryId: repoRecord.id,
+      commitSha: afterSha,
+      branch,
+    },
+  })
+}
