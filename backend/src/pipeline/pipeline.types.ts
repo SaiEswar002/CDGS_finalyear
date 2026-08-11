@@ -5,7 +5,7 @@
 
 /** Shared Contract #3: Pipeline Statuses & Stages */
 export type PipelineStatus = 'queued' | 'running' | 'success' | 'failed' | 'retrying'
-export type PipelineStage = 'webhook' | 'clone' | 'diff'
+export type PipelineStage = 'webhook' | 'clone' | 'diff' | 'docgen' | 'ai' | 'publish'
 
 /** Shared Contract #1: Queue Job Payload (Hari produces, Lokesh consumes) */
 export interface DocumentationPipelineJob {
