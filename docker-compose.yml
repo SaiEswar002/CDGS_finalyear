@@ -40,16 +40,17 @@ services:
       - redis_data:/data
     command: redis-server --appendonly yes
 
-  # ── Worker stub (Phase 3 — not yet functional) ──────────────
-  # worker:
-  #   build:
-  #     context: ./backend
-  #     dockerfile: Dockerfile.dev
-  #   command: echo "Worker stub — BullMQ not yet implemented"
-  #   env_file:
-  #     - .env
-  #   depends_on:
-  #     - redis
+  # ── Worker Service (Phase 3 BullMQ Pipeline Worker) ─────────
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    command: npm run worker:dev
+    env_file:
+      - .env
+    depends_on:
+      - redis
+      - backend
 
 volumes:
   redis_data:
