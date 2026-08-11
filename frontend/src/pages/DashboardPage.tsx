@@ -4,6 +4,8 @@ import { api } from '../lib/api'
 import { useAuthStore } from '../store/authStore'
 import type { Repository } from '../components/RepositoryCard'
 
+import PipelineRunsTable from '../components/PipelineRunsTable'
+
 interface StatsData {
   connectedRepos: number
   githubRepos: number | null
@@ -11,7 +13,7 @@ interface StatsData {
 
 /**
  * DashboardPage — /dashboard (protected)
- * Shows summary stats and quick links.
+ * Shows summary stats, recent pipeline runs dashboard, and quick links.
  */
 export default function DashboardPage() {
   const { user } = useAuthStore()
@@ -38,9 +40,9 @@ export default function DashboardPage() {
   }, [])
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 animate-slide-up">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 animate-slide-up space-y-8">
       {/* Welcome */}
-      <div className="mb-10">
+      <div>
         <h1 className="text-4xl font-extrabold text-slate-100 mb-2">
           Welcome back,{' '}
           <span className="text-gradient">
@@ -53,7 +55,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-10">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
         {[
           {
             label: 'Connected Repos',
@@ -69,7 +71,7 @@ export default function DashboardPage() {
             link: '/repositories',
             linkLabel: 'Import',
           },
-          { label: 'Doc Runs', value: '—', icon: '⚙️', note: 'Phase 3' },
+          { label: 'Pipeline Runs', value: 'Active', icon: '⚙️', note: 'Phase 3' },
           { label: 'AI Tokens Used', value: '—', icon: '🧠', note: 'Phase 4' },
         ].map((stat) => (
           <div key={stat.label} className="glass-card p-6">
@@ -98,6 +100,9 @@ export default function DashboardPage() {
           </div>
         ))}
       </div>
+
+      {/* Pipeline Runs Table Dashboard */}
+      <PipelineRunsTable />
 
       {/* Quick actions */}
       <div className="glass-card p-8">

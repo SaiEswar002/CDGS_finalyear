@@ -3,6 +3,7 @@ import { healthRouter } from './health'
 import { authRouter } from '../auth/auth.router'
 import { repositoriesRouter } from '../repositories/repositories.router'
 import { githubRouter } from '../github/github.router'
+import { pipelineRouter } from '../pipeline/pipeline.router'
 
 /**
  * Root API router.
@@ -19,6 +20,8 @@ import { githubRouter } from '../github/github.router'
  *   GET  /api/v1/repositories
  *   GET  /api/v1/repositories/:id
  *   DELETE /api/v1/repositories/:id
+ *   GET  /api/v1/pipeline-runs
+ *   GET  /api/v1/pipeline-runs/:id
  */
 export const apiRouter = Router()
 
@@ -26,4 +29,6 @@ apiRouter.use('/health', healthRouter)
 apiRouter.use('/auth', authRouter)
 apiRouter.use('/github', githubRouter)
 apiRouter.use('/repositories', repositoriesRouter)
+apiRouter.use('/pipeline-runs', pipelineRouter)
+
 
