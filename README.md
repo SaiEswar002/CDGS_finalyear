@@ -1,4 +1,4 @@
-# CDGS — Code Documentation Generation System
+# DocOps — Code Documentation Generation System
 
 > Automated, AI-powered documentation generation for GitHub repositories.
 

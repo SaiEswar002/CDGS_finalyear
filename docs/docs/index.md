@@ -1,12 +1,12 @@
-# CDGS — Code Documentation Generation System
+# DocOps — Code Documentation Generation System
 
-Welcome to the CDGS documentation.
+Welcome to the DocOps documentation.
 
 > This documentation site is scaffolded in Phase 1 and will be populated as phases are implemented.
 
-## What is CDGS?
+## What is DocOps?
 
-CDGS connects to your GitHub repositories, listens for push events via webhooks, and automatically generates, versions, and publishes beautiful documentation powered by AI.
+DocOps connects to your GitHub repositories, listens for push events via webhooks, and automatically generates, versions, and publishes beautiful documentation powered by AI.
 
 ## Phases
 

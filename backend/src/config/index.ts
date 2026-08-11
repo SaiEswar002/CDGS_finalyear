@@ -18,11 +18,27 @@ const envSchema = z.object({
     .default('development'),
 
   // Supabase
-  SUPABASE_URL: z.string().url('SUPABASE_URL must be a valid URL'),
-  SUPABASE_ANON_KEY: z.string().min(1, 'SUPABASE_ANON_KEY is required'),
+  SUPABASE_URL: z
+    .string()
+    .url('SUPABASE_URL must be a valid URL')
+    .refine(
+      (val) => !/placeholder|your-project|example/i.test(val),
+      'SUPABASE_URL contains a placeholder value',
+    ),
+  SUPABASE_ANON_KEY: z
+    .string()
+    .min(1, 'SUPABASE_ANON_KEY is required')
+    .refine(
+      (val) => !/placeholder|your-supabase|example/i.test(val),
+      'SUPABASE_ANON_KEY contains a placeholder value',
+    ),
   SUPABASE_SERVICE_ROLE_KEY: z
     .string()
-    .min(1, 'SUPABASE_SERVICE_ROLE_KEY is required'),
+    .min(1, 'SUPABASE_SERVICE_ROLE_KEY is required')
+    .refine(
+      (val) => !/placeholder|your-supabase|example/i.test(val),
+      'SUPABASE_SERVICE_ROLE_KEY contains a placeholder value',
+    ),
 
   // Redis
   REDIS_URL: z.string().default('redis://localhost:6379'),

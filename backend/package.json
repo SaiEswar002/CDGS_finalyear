@@ -1,5 +1,5 @@
 {
-  "name": "cdgs-backend",
+  "name": "docops-backend",
   "version": "0.2.0",
   "private": true,
   "main": "dist/index.js",

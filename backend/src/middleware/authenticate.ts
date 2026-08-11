@@ -6,7 +6,7 @@ import { logger } from '../logger'
 /**
  * Authentication middleware.
  *
- * Reads the `cdgs_token` httpOnly cookie, verifies the JWT, loads the user
+ * Reads the `docops_token` httpOnly cookie, verifies the JWT, loads the user
  * from the database, and attaches it to `req.user`.
  *
  * On any failure — missing cookie, expired token, invalid token, deactivated

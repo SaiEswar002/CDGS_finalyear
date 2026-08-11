@@ -45,7 +45,7 @@ export default function LoginPage() {
         </div>
 
         <h1 className="text-4xl font-extrabold text-slate-100 mb-3">
-          Welcome to CDGS
+          Welcome to DocOps
         </h1>
         <p className="text-slate-400 mb-10 leading-relaxed">
           Sign in with your GitHub account to start automatically generating

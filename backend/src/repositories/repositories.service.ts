@@ -5,7 +5,7 @@ import { HttpError } from '../middleware/errorHandler'
 import { logger } from '../logger'
 import type { ImportRepositoryBody } from './repositories.schema'
 
-/** Shape of a repository record as stored/returned by CDGS */
+/** Shape of a repository record as stored/returned by DocOps */
 export interface Repository {
   id: string
   user_id: string
@@ -26,12 +26,7 @@ export interface Repository {
   updated_at: string
 }
 
-const REPO_SELECT = [
-  'id', 'user_id', 'github_repo_id', 'owner', 'name', 'full_name',
-  'default_branch', 'selected_branch', 'private', 'is_private',
-  'description', 'language', 'clone_url', 'html_url',
-  'is_active', 'last_synced_at', 'created_at', 'updated_at',
-].join(', ')
+const REPO_SELECT = '*'
 
 /**
  * Imports a GitHub repository for the given user.
@@ -140,7 +135,7 @@ export async function listRepositories(userId: string): Promise<Repository[]> {
 }
 
 /**
- * Gets a single repository by CDGS ID, enforcing user ownership.
+ * Gets a single repository by DocOps ID, enforcing user ownership.
  *
  * @throws HttpError 404 if not found or not owned by this user
  */
@@ -171,7 +166,7 @@ export async function getRepository(
 
 /**
  * Deletes the local repository connection.
- * This NEVER touches GitHub — it only removes the CDGS record.
+ * This NEVER touches GitHub — it only removes the DocOps record.
  *
  * @throws HttpError 404 if not found or not owned by this user
  */
@@ -197,3 +192,99 @@ export async function deleteRepository(
 
   logger.info({ userId, repoId }, 'Repository disconnected (local only)')
 }
+
+/**
+ * Gets languages breakdown for a repository.
+ */
+export async function getRepositoryLanguagesService(
+  userId: string,
+  repoId: string,
+) {
+  const repo = await getRepository(userId, repoId)
+  const encryptedToken = await getEncryptedTokenForUser(userId)
+  if (!encryptedToken) {
+    throw new HttpError(401, 'NO_TOKEN', 'GitHub token not found. Please sign in again.')
+  }
+
+  const { getRepositoryLanguages } = await import('../github/service')
+  const rawLangs = await getRepositoryLanguages(encryptedToken, repo.owner, repo.name)
+
+  const totalBytes = Object.values(rawLangs).reduce((acc, bytes) => acc + bytes, 0)
+  const languages = Object.entries(rawLangs).map(([name, bytes]) => ({
+    name,
+    bytes,
+    percentage: totalBytes > 0 ? Number(((bytes / totalBytes) * 100).toFixed(1)) : 0,
+  }))
+
+  return { languages, totalBytes }
+}
+
+/**
+ * Gets commit history for a repository.
+ */
+export async function getRepositoryCommitsService(
+  userId: string,
+  repoId: string,
+) {
+  const repo = await getRepository(userId, repoId)
+  const encryptedToken = await getEncryptedTokenForUser(userId)
+  if (!encryptedToken) {
+    throw new HttpError(401, 'NO_TOKEN', 'GitHub token not found. Please sign in again.')
+  }
+
+  const { getRepositoryCommits } = await import('../github/service')
+  const branch = repo.selected_branch ?? repo.default_branch ?? 'main'
+  const commits = await getRepositoryCommits(encryptedToken, repo.owner, repo.name, branch, 20)
+
+  return { commits }
+}
+
+/**
+ * Gets repository file & folder tree.
+ */
+export async function getRepositoryTreeService(
+  userId: string,
+  repoId: string,
+) {
+  const repo = await getRepository(userId, repoId)
+  const encryptedToken = await getEncryptedTokenForUser(userId)
+  if (!encryptedToken) {
+    throw new HttpError(401, 'NO_TOKEN', 'GitHub token not found. Please sign in again.')
+  }
+
+  const { getRepositoryTree } = await import('../github/service')
+  const branch = repo.selected_branch ?? repo.default_branch ?? 'main'
+  const tree = await getRepositoryTree(encryptedToken, repo.owner, repo.name, branch)
+
+  return { tree, count: tree.length }
+}
+
+/**
+ * Reads file content from GitHub repository.
+ */
+export async function getRepositoryFileService(
+  userId: string,
+  repoId: string,
+  filePath: string,
+) {
+  const repo = await getRepository(userId, repoId)
+  const encryptedToken = await getEncryptedTokenForUser(userId)
+  if (!encryptedToken) {
+    throw new HttpError(401, 'NO_TOKEN', 'GitHub token not found. Please sign in again.')
+  }
+
+  const { getFileContent } = await import('../github/service')
+  const branch = repo.selected_branch ?? repo.default_branch ?? 'main'
+  const file = await getFileContent(encryptedToken, repo.owner, repo.name, filePath, branch)
+
+  if (!file) {
+    throw new HttpError(404, 'FILE_NOT_FOUND', 'File not found or not accessible on GitHub.')
+  }
+
+  // Construct edit URL on GitHub
+  const editUrl = `https://github.com/${repo.owner}/${repo.name}/edit/${branch}/${filePath}`
+
+  return { file, editUrl }
+}
+
+

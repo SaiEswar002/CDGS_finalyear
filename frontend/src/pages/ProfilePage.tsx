@@ -78,7 +78,7 @@ export default function ProfilePage() {
                      hover:bg-red-500/10 hover:border-red-500/50
                      transition-all duration-200"
         >
-          Sign out of CDGS
+          Sign out of DocOps
         </button>
       </div>
     </div>

@@ -4,6 +4,7 @@ import {
   importRepositorySchema,
   repositoryIdParamSchema,
 } from './repositories.schema'
+import { HttpError } from '../middleware/errorHandler'
 import {
   importRepository,
   listRepositories,
@@ -105,3 +106,98 @@ export async function deleteRepositoryHandler(
     next(err)
   }
 }
+
+/**
+ * GET /api/v1/repositories/:id/languages
+ */
+export async function getRepositoryLanguagesHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const { getRepositoryLanguagesService } = await import('./repositories.service')
+    const result = await getRepositoryLanguagesService(req.user!.id, req.params.id)
+
+    res.json({
+      success: true,
+      message: 'Languages retrieved successfully.',
+      data: result,
+    })
+  } catch (err) {
+    next(err)
+  }
+}
+
+/**
+ * GET /api/v1/repositories/:id/commits
+ */
+export async function getRepositoryCommitsHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const { getRepositoryCommitsService } = await import('./repositories.service')
+    const result = await getRepositoryCommitsService(req.user!.id, req.params.id)
+
+    res.json({
+      success: true,
+      message: 'Commits retrieved successfully.',
+      data: result,
+    })
+  } catch (err) {
+    next(err)
+  }
+}
+
+/**
+ * GET /api/v1/repositories/:id/tree
+ */
+export async function getRepositoryTreeHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const { getRepositoryTreeService } = await import('./repositories.service')
+    const result = await getRepositoryTreeService(req.user!.id, req.params.id)
+
+    res.json({
+      success: true,
+      message: 'Repository tree retrieved successfully.',
+      data: result,
+    })
+  } catch (err) {
+    next(err)
+  }
+}
+
+/**
+ * GET /api/v1/repositories/:id/file?path=...
+ */
+export async function getRepositoryFileHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const filePath = req.query.path as string
+    if (!filePath) {
+      throw new HttpError(400, 'PATH_REQUIRED', 'Query parameter "path" is required.')
+    }
+
+    const { getRepositoryFileService } = await import('./repositories.service')
+    const result = await getRepositoryFileService(req.user!.id, req.params.id, filePath)
+
+    res.json({
+      success: true,
+      message: 'File content retrieved successfully.',
+      data: result,
+    })
+  } catch (err) {
+    next(err)
+  }
+}
+
+

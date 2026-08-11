@@ -64,17 +64,31 @@ export default function RepositoriesPage() {
             {repos.length} {repos.length === 1 ? 'repository' : 'repositories'} connected
           </p>
         </div>
-        <button
-          id="open-import-modal"
-          type="button"
-          onClick={() => setModalOpen(true)}
-          className="btn-primary"
-        >
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-            <path d="M8 2V14M2 8H14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-          </svg>
-          Import Repository
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            disabled={loading}
+            onClick={() => {
+              fetchRepos()
+              toast.success('Repositories refreshed!')
+            }}
+            className="btn-secondary !py-2.5 !px-4 !text-sm flex items-center gap-1.5 disabled:opacity-50"
+          >
+            <span className={loading ? 'animate-spin inline-block' : ''}>↻</span>
+            Refresh
+          </button>
+          <button
+            id="open-import-modal"
+            type="button"
+            onClick={() => setModalOpen(true)}
+            className="btn-primary"
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              <path d="M8 2V14M2 8H14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+            </svg>
+            Import Repository
+          </button>
+        </div>
       </div>
 
       {/* Table / Loading */}

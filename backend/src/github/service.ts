@@ -159,3 +159,146 @@ export async function refreshRepositoryMetadata(
 ): Promise<GitHubRepo | null> {
   return getRepository(encryptedToken, owner, repo)
 }
+
+/** Interface for git tree item */
+export interface GitHubTreeItem {
+  path: string
+  mode: string
+  type: 'blob' | 'tree'
+  sha: string
+  size?: number
+}
+
+/** Interface for GitHub commit item */
+export interface GitHubCommitItem {
+  sha: string
+  commit: {
+    message: string
+    author: {
+      name: string
+      date: string
+    }
+  }
+  author: {
+    login: string
+    avatar_url: string
+  } | null
+  html_url: string
+}
+
+/**
+ * Fetches repository language breakdown (bytes per language).
+ */
+export async function getRepositoryLanguages(
+  encryptedToken: string,
+  owner: string,
+  repo: string,
+): Promise<Record<string, number>> {
+  const client = createGitHubClient(encryptedToken)
+  const { data } = await client.get<Record<string, number>>(`/repos/${owner}/${repo}/languages`)
+  return data
+}
+
+/**
+ * Fetches recent repository commits.
+ */
+export async function getRepositoryCommits(
+  encryptedToken: string,
+  owner: string,
+  repo: string,
+  branch: string = 'main',
+  limit: number = 15,
+): Promise<GitHubCommitItem[]> {
+  try {
+    const client = createGitHubClient(encryptedToken)
+    const { data } = await client.get<GitHubCommitItem[]>(`/repos/${owner}/${repo}/commits`, {
+      params: { sha: branch, per_page: limit },
+    })
+    return data
+  } catch (err: unknown) {
+    if (axios.isAxiosError(err) && (err.response?.status === 404 || err.response?.status === 409)) {
+      return []
+    }
+    throw err
+  }
+}
+
+/**
+ * Fetches full repository git file & folder tree.
+ */
+export async function getRepositoryTree(
+  encryptedToken: string,
+  owner: string,
+  repo: string,
+  branch: string = 'main',
+): Promise<GitHubTreeItem[]> {
+  try {
+    const client = createGitHubClient(encryptedToken)
+    const { data } = await client.get<{ tree: GitHubTreeItem[]; truncated: boolean }>(
+      `/repos/${owner}/${repo}/git/trees/${branch}`,
+      { params: { recursive: 1 } },
+    )
+    return data.tree ?? []
+  } catch (err: unknown) {
+    if (axios.isAxiosError(err) && (err.response?.status === 404 || err.response?.status === 409)) {
+      return []
+    }
+    throw err
+  }
+}
+
+export interface GitHubFileContent {
+  path: string
+  name: string
+  size: number
+  sha: string
+  content: string
+  html_url: string
+}
+
+/**
+ * Fetches raw file content from GitHub repository.
+ */
+export async function getFileContent(
+  encryptedToken: string,
+  owner: string,
+  repo: string,
+  filePath: string,
+  branch: string = 'main',
+): Promise<GitHubFileContent | null> {
+  try {
+    const client = createGitHubClient(encryptedToken)
+    const { data } = await client.get<{
+      path: string
+      name: string
+      size: number
+      sha: string
+      content?: string
+      encoding?: string
+      html_url: string
+    }>(`/repos/${owner}/${repo}/contents/${filePath}`, {
+      params: { ref: branch },
+    })
+
+    let rawContent = ''
+    if (data.content) {
+      rawContent = Buffer.from(data.content, 'base64').toString('utf8')
+    }
+
+    return {
+      path: data.path,
+      name: data.name,
+      size: data.size,
+      sha: data.sha,
+      content: rawContent,
+      html_url: data.html_url,
+    }
+  } catch (err: unknown) {
+    if (axios.isAxiosError(err) && (err.response?.status === 404 || err.response?.status === 403)) {
+      return null
+    }
+    throw err
+  }
+}
+
+

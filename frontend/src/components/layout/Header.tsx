@@ -34,7 +34,7 @@ export default function Header() {
                 />
               </svg>
             </div>
-            <span className="font-bold text-sm tracking-wide text-slate-100">CDGS</span>
+            <span className="font-bold text-sm tracking-wide text-slate-100">DocOps</span>
           </Link>
 
           {/* Right side */}

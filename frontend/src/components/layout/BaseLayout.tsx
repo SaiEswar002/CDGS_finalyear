@@ -13,7 +13,7 @@ export default function BaseLayout() {
         <Outlet />
       </main>
       <footer className="border-t border-white/5 py-6 text-center text-sm text-slate-500">
-        © {new Date().getFullYear()} CDGS — Code Documentation Generation System
+        © {new Date().getFullYear()} DocOps — Code Documentation Generation System
       </footer>
     </div>
   )

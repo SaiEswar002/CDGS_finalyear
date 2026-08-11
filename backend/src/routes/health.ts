@@ -42,6 +42,7 @@ export const healthRouter = Router()
 healthRouter.get('/', (_req: Request, res: Response): void => {
   res.json({
     success: true,
+    message: 'Service is healthy.',
     data: {
       status: 'ok',
       uptime: process.uptime(),
