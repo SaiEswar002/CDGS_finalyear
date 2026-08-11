@@ -12,13 +12,13 @@ const swaggerOptions: swaggerJsdoc.Options = {
   definition: {
     openapi: '3.0.3',
     info: {
-      title: 'DocOps API',
+      title: 'CDGS API — Continuous Documentation Generation System',
       version: '1.0.0',
       description:
-        'Code Documentation Generation System — REST API reference.\n\n' +
+        'Continuous Documentation Generation System — REST API reference.\n\n' +
         'This spec is populated progressively as phases are implemented.',
       contact: {
-        name: 'DocOps Team',
+        name: 'CDGS Team',
         url: 'https://github.com/SaiEswar002/CDGS_finalyear',
       },
       license: {
@@ -87,7 +87,7 @@ export function mountSwagger(app: Application): void {
     '/api/v1/docs',
     swaggerUi.serve,
     swaggerUi.setup(swaggerSpec, {
-      customSiteTitle: 'DocOps API Docs',
+      customSiteTitle: 'CDGS API Docs',
       swaggerOptions: {
         persistAuthorization: true,
       },

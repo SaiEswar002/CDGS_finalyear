@@ -5,7 +5,7 @@ import { HttpError } from '../middleware/errorHandler'
 import { logger } from '../logger'
 import type { ImportRepositoryBody } from './repositories.schema'
 
-/** Shape of a repository record as stored/returned by DocOps */
+/** Shape of a repository record as stored/returned by CDGS */
 export interface Repository {
   id: string
   user_id: string
@@ -135,7 +135,7 @@ export async function listRepositories(userId: string): Promise<Repository[]> {
 }
 
 /**
- * Gets a single repository by DocOps ID, enforcing user ownership.
+ * Gets a single repository by CDGS ID, enforcing user ownership.
  *
  * @throws HttpError 404 if not found or not owned by this user
  */
@@ -166,7 +166,7 @@ export async function getRepository(
 
 /**
  * Deletes the local repository connection.
- * This NEVER touches GitHub — it only removes the DocOps record.
+ * This NEVER touches GitHub — it only removes the CDGS record.
  *
  * @throws HttpError 404 if not found or not owned by this user
  */

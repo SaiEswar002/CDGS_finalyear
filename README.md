@@ -1,28 +1,19 @@
-# DocOps — Code Documentation Generation System
+# CDGS — Continuous Documentation Generation System
 
 > Automated, AI-powered documentation generation for GitHub repositories.
 
 ---
 
-## What's Implemented (Phase 1 — Foundation)
+## Implementation Status
 
-| Area | Status |
+| Phase / Module | Status |
 |---|---|
-| Frontend (React + Vite + Tailwind + Router) | ✅ |
-| Backend (Express + TypeScript strict) | ✅ |
-| `GET /api/v1/health` | ✅ |
-| Centralized config loader (zod-validated) | ✅ |
-| Structured logging (pino) | ✅ |
-| Centralized error-handling middleware | ✅ |
-| Zod validation middleware factory | ✅ |
-| Supabase client | ✅ |
-| Database schema (10 tables) | ✅ |
-| Docker Compose (frontend, backend, redis) | ✅ |
-| Swagger base config (`/api/v1/docs`) | ✅ |
-| JSDoc base config | ✅ |
-| MkDocs base config | ✅ |
+| Phase 1: Foundation (React + Express + TS + Pino + Zod + Supabase) | ✅ Complete |
+| Phase 2: Auth & Repo Import (GitHub OAuth + Token Encryption + File Tree + Commits + Reader) | ✅ Complete |
+| Phase 3: Webhooks, Job Queue (BullMQ/Redis), Git Clone/Diff, AI Doc Engine | ⏳ Phase 3 |
+| Phase 4: Documentation Versioning & Public Portal | ⏳ Phase 4 |
 
-**Not yet implemented (later phases):** GitHub OAuth, GitHub API calls, webhook handling, BullMQ job processing, AI provider calls, documentation generation, versioning logic.
+📖 **For Team Setup & Module Development Guide, see [TEAM_SETUP_GUIDE.md](TEAM_SETUP_GUIDE.md).**
 
 ---
 

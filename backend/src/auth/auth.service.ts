@@ -8,8 +8,8 @@ import { logger } from '../logger'
 import type { AuthUser, JwtUserPayload } from '../types/express'
 import type { GitHubUser } from '../github/service'
 
-const JWT_COOKIE_NAME = 'docops_token'
-const STATE_COOKIE_NAME = 'docops_oauth_state'
+const JWT_COOKIE_NAME = 'cdgs_token'
+const STATE_COOKIE_NAME = 'cdgs_oauth_state'
 
 export { JWT_COOKIE_NAME, STATE_COOKIE_NAME }
 
@@ -177,7 +177,7 @@ export function issueJwt(userId: string): string {
   const options: SignOptions = {
     subject: userId,
     expiresIn: config.auth.jwtExpiresIn as SignOptions['expiresIn'],
-    issuer: 'docops',
+    issuer: 'cdgs',
   }
   return sign({}, config.auth.jwtSecret, options)
 }
@@ -190,6 +190,6 @@ export function issueJwt(userId: string): string {
  */
 export function verifyJwt(token: string): JwtUserPayload {
   return verify(token, config.auth.jwtSecret, {
-    issuer: 'docops',
+    issuer: 'cdgs',
   }) as JwtUserPayload
 }

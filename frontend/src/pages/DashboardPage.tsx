@@ -20,7 +20,7 @@ export default function DashboardPage() {
   const [loadingGitHub, setLoadingGitHub] = useState(true)
 
   useEffect(() => {
-    // Fetch DocOps connected repos count
+    // Fetch CDGS connected repos count
     api
       .get<{ success: boolean; data: { repositories: Repository[]; count: number } }>(
         '/repositories',
@@ -48,7 +48,7 @@ export default function DashboardPage() {
           </span>
         </h1>
         <p className="text-slate-400">
-          Here&apos;s an overview of your DocOps workspace.
+          Here&apos;s an overview of your CDGS workspace.
         </p>
       </div>
 

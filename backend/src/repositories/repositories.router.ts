@@ -32,7 +32,7 @@ repositoriesRouter.get('/', listRepositoriesHandler)
 
 /**
  * @route GET /api/v1/repositories/:id
- * @desc  Get a single repository by DocOps UUID
+ * @desc  Get a single repository by CDGS UUID
  */
 repositoriesRouter.get('/:id', validateRepoIdParam, getRepositoryHandler)
 

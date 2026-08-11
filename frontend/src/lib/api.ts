@@ -2,7 +2,7 @@ import axios from 'axios'
 import { useAuthStore } from '../store/authStore'
 
 /**
- * Shared Axios instance for all DocOps API calls.
+ * Shared Axios instance for all CDGS API calls.
  *
  * - Base URL: /api/v1 (proxied to backend via Vite in dev)
  * - Credentials: true — sends the httpOnly JWT cookie automatically

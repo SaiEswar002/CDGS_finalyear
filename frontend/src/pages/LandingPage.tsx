@@ -90,7 +90,7 @@ export default function LandingPage() {
           <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/5 border border-white/10 mb-8 backdrop-blur-md">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
             <span className="text-xs font-semibold text-slate-300">
-              DocOps Platform Live • GitHub OAuth & Supabase Integrated
+              CDGS Platform Live • GitHub OAuth & Supabase Integrated
             </span>
           </div>
 
@@ -102,7 +102,7 @@ export default function LandingPage() {
 
           {/* Sub-headline */}
           <p className="text-lg sm:text-xl text-slate-400 max-w-3xl mx-auto mb-10 leading-relaxed font-normal">
-            Automate your codebase documentation workflows. DocOps connects directly to your GitHub account, monitors repository updates, and generates structured, production-ready documentation using AI.
+            Automate your codebase documentation workflows. CDGS connects directly to your GitHub account, monitors repository updates, and generates structured, production-ready documentation using AI.
           </p>
 
           {/* Action CTAs */}
@@ -141,7 +141,7 @@ export default function LandingPage() {
               <span className="w-3 h-3 rounded-full bg-red-500/80 inline-block" />
               <span className="w-3 h-3 rounded-full bg-yellow-500/80 inline-block" />
               <span className="w-3 h-3 rounded-full bg-green-500/80 inline-block" />
-              <span className="text-xs font-mono text-slate-400 ml-2">docops-documentation-pipeline.ts</span>
+              <span className="text-xs font-mono text-slate-400 ml-2">cdgs-documentation-pipeline.ts</span>
             </div>
             <span className="text-xs font-mono text-brand-400 bg-brand-500/10 px-2.5 py-1 rounded-md">
               AI Generation Engine Active
@@ -149,12 +149,12 @@ export default function LandingPage() {
           </div>
 
           <div className="p-6 font-mono text-xs sm:text-sm leading-relaxed space-y-2 overflow-x-auto text-slate-300">
-            <p className="text-slate-500">// Initialize DocOps pipeline trigger</p>
-            <p className="text-emerald-400">const repository = await docops.importRepo(&quot;owner/repo&quot;);</p>
+            <p className="text-slate-500">// Initialize CDGS pipeline trigger</p>
+            <p className="text-emerald-400">const repository = await cdgs.importRepo(&quot;owner/repo&quot;);</p>
             <p className="text-slate-500">// Run AST analysis & prompt synthesis</p>
-            <p className="text-violet-400">const docs = await docops.generateDocs(repository.codebase, &#123; model: &quot;gpt-4o&quot; &#125;);</p>
+            <p className="text-violet-400">const docs = await cdgs.generateDocs(repository.codebase, &#123; model: &quot;gpt-4o&quot; &#125;);</p>
             <p className="text-slate-500">// Version & publish output</p>
-            <p className="text-brand-300">await docops.publishVersion(&#123; version: &quot;v1.2.0&quot;, docs &#125;);</p>
+            <p className="text-brand-300">await cdgs.publishVersion(&#123; version: &quot;v1.2.0&quot;, docs &#125;);</p>
           </div>
         </div>
       </section>
@@ -166,7 +166,7 @@ export default function LandingPage() {
             Engineered for Modern Software Teams
           </h2>
           <p className="text-slate-400 max-w-2xl mx-auto text-base">
-            From automated GitHub authentication to background queue processing, DocOps handles your end-to-end documentation ecosystem.
+            From automated GitHub authentication to background queue processing, CDGS handles your end-to-end documentation ecosystem.
           </p>
         </div>
 
@@ -202,7 +202,7 @@ export default function LandingPage() {
       {/* ── How It Works ───────────────────────────────────────────── */}
       <section className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-14">
-          <h2 className="text-3xl font-bold text-slate-100 mb-3">How DocOps Works</h2>
+          <h2 className="text-3xl font-bold text-slate-100 mb-3">How CDGS Works</h2>
           <p className="text-slate-400">Get your automated documentation setup in 3 simple steps</p>
         </div>
 

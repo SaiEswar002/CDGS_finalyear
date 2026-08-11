@@ -131,7 +131,7 @@ describe('POST /api/v1/repositories — import', () => {
     const app = makeApp()
     const res = await request(app)
       .post('/api/v1/repositories')
-      .set('Cookie', `docops_token=${validJwt()}`)
+      .set('Cookie', `cdgs_token=${validJwt()}`)
       .send({ github_repo_id: 'not-a-number', owner: 'a', name: 'b' })
 
     expect(res.status).toBe(400)
@@ -146,7 +146,7 @@ describe('POST /api/v1/repositories — import', () => {
     const app = makeApp()
     const res = await request(app)
       .post('/api/v1/repositories')
-      .set('Cookie', `docops_token=${validJwt()}`)
+      .set('Cookie', `cdgs_token=${validJwt()}`)
       .send(IMPORT_BODY)
 
     expect(res.status).toBe(409)
@@ -163,7 +163,7 @@ describe('POST /api/v1/repositories — import', () => {
     const app = makeApp()
     const res = await request(app)
       .post('/api/v1/repositories')
-      .set('Cookie', `docops_token=${validJwt()}`)
+      .set('Cookie', `cdgs_token=${validJwt()}`)
       .send(IMPORT_BODY)
 
     expect(res.status).toBe(403)
@@ -181,7 +181,7 @@ describe('POST /api/v1/repositories — import', () => {
     const app = makeApp()
     const res = await request(app)
       .post('/api/v1/repositories')
-      .set('Cookie', `docops_token=${validJwt()}`)
+      .set('Cookie', `cdgs_token=${validJwt()}`)
       .send(IMPORT_BODY)
 
     expect(res.status).toBe(201)
@@ -206,7 +206,7 @@ describe('GET /api/v1/repositories — list', () => {
     const app = makeApp()
     const res = await request(app)
       .get('/api/v1/repositories')
-      .set('Cookie', `docops_token=${validJwt()}`)
+      .set('Cookie', `cdgs_token=${validJwt()}`)
 
     expect(res.status).toBe(200)
     expect(res.body.success).toBe(true)
@@ -220,7 +220,7 @@ describe('GET /api/v1/repositories/:id', () => {
     const app = makeApp()
     const res = await request(app)
       .get('/api/v1/repositories/not-a-uuid')
-      .set('Cookie', `docops_token=${validJwt()}`)
+      .set('Cookie', `cdgs_token=${validJwt()}`)
 
     expect(res.status).toBe(400)
   })
@@ -232,7 +232,7 @@ describe('GET /api/v1/repositories/:id', () => {
     const app = makeApp()
     const res = await request(app)
       .get(`/api/v1/repositories/${MOCK_REPO_ID}`)
-      .set('Cookie', `docops_token=${validJwt()}`)
+      .set('Cookie', `cdgs_token=${validJwt()}`)
 
     expect(res.status).toBe(404)
     expect(res.body.success).toBe(false)
@@ -245,7 +245,7 @@ describe('GET /api/v1/repositories/:id', () => {
     const app = makeApp()
     const res = await request(app)
       .get(`/api/v1/repositories/${MOCK_REPO_ID}`)
-      .set('Cookie', `docops_token=${validJwt()}`)
+      .set('Cookie', `cdgs_token=${validJwt()}`)
 
     expect(res.status).toBe(200)
     expect(res.body.success).toBe(true)
@@ -268,7 +268,7 @@ describe('DELETE /api/v1/repositories/:id', () => {
     const app = makeApp()
     const res = await request(app)
       .delete(`/api/v1/repositories/${MOCK_REPO_ID}`)
-      .set('Cookie', `docops_token=${validJwt()}`)
+      .set('Cookie', `cdgs_token=${validJwt()}`)
 
     expect(res.status).toBe(404)
   })
@@ -288,7 +288,7 @@ describe('DELETE /api/v1/repositories/:id', () => {
     const app = makeApp()
     const res = await request(app)
       .delete(`/api/v1/repositories/${MOCK_REPO_ID}`)
-      .set('Cookie', `docops_token=${validJwt()}`)
+      .set('Cookie', `cdgs_token=${validJwt()}`)
 
     expect(res.status).toBe(200)
     expect(res.body.success).toBe(true)

@@ -13,7 +13,7 @@ async function main(): Promise<void> {
   const server = app.listen(config.port, () => {
     logger.info(
       { port: config.port, env: config.nodeEnv },
-      'DocOps backend started',
+      'CDGS backend started',
     )
   })
 

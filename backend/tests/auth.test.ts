@@ -81,7 +81,7 @@ describe('GET /api/v1/auth/github/callback', () => {
     const app = makeApp()
     const res = await request(app)
       .get('/api/v1/auth/github/callback?code=abc123&state=wrongstate')
-      .set('Cookie', 'docops_oauth_state=differentstate')
+      .set('Cookie', 'cdgs_oauth_state=differentstate')
 
     expect(res.status).toBe(400)
     expect(res.body.success).toBe(false)
@@ -97,7 +97,7 @@ describe('GET /api/v1/auth/github/callback', () => {
     const app = makeApp()
     const res = await request(app)
       .get(`/api/v1/auth/github/callback?code=abc123&state=${state}`)
-      .set('Cookie', `docops_oauth_state=${state}`)
+      .set('Cookie', `cdgs_oauth_state=${state}`)
 
     expect(res.status).toBe(400)
     expect(res.body.success).toBe(false)
@@ -126,7 +126,7 @@ describe('GET /api/v1/auth/me', () => {
     const app = makeApp()
     const res = await request(app)
       .get('/api/v1/auth/me')
-      .set('Cookie', 'docops_token=not.a.valid.jwt')
+      .set('Cookie', 'cdgs_token=not.a.valid.jwt')
 
     expect(res.status).toBe(401)
     expect(res.body.success).toBe(false)
@@ -138,13 +138,13 @@ describe('GET /api/v1/auth/me', () => {
     const expiredToken = sign(
       { sub: MOCK_USER.id },
       process.env.JWT_SECRET!,
-      { expiresIn: -1, issuer: 'docops' },
+      { expiresIn: -1, issuer: 'cdgs' },
     )
 
     const app = makeApp()
     const res = await request(app)
       .get('/api/v1/auth/me')
-      .set('Cookie', `docops_token=${expiredToken}`)
+      .set('Cookie', `cdgs_token=${expiredToken}`)
 
     expect(res.status).toBe(401)
     expect(res.body.success).toBe(false)
@@ -155,7 +155,7 @@ describe('GET /api/v1/auth/me', () => {
     const app = makeApp()
     const res = await request(app)
       .get('/api/v1/auth/me')
-      .set('Cookie', `docops_token=${validJwt()}`)
+      .set('Cookie', `cdgs_token=${validJwt()}`)
 
     expect(res.status).toBe(200)
     expect(res.body.success).toBe(true)
@@ -170,7 +170,7 @@ describe('POST /api/v1/auth/logout', () => {
     const app = makeApp()
     const res = await request(app)
       .post('/api/v1/auth/logout')
-      .set('Cookie', `docops_token=${validJwt()}`)
+      .set('Cookie', `cdgs_token=${validJwt()}`)
 
     expect(res.status).toBe(200)
     expect(res.body.success).toBe(true)
@@ -178,7 +178,7 @@ describe('POST /api/v1/auth/logout', () => {
     // Cookie should be cleared (set with empty value / expired)
     const cookies = res.headers['set-cookie'] as string[] | undefined
     if (cookies) {
-      const tokenCookie = cookies.find((c) => c.startsWith('docops_token='))
+      const tokenCookie = cookies.find((c) => c.startsWith('cdgs_token='))
       expect(tokenCookie).toBeDefined()
       expect(tokenCookie).toMatch(/Expires=Thu, 01 Jan 1970|Max-Age=0/i)
     }
