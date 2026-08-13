@@ -3,8 +3,8 @@ import dotenv from 'dotenv'
 import { z } from 'zod'
 
 // Load .env from cwd or parent root directory
-dotenv.config()
-dotenv.config({ path: path.resolve(process.cwd(), '../.env') })
+dotenv.config({ override: true })
+dotenv.config({ path: path.resolve(process.cwd(), '../.env'), override: true })
 
 /**
  * Zod schema for all environment variables.
