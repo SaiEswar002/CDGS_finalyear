@@ -53,6 +53,31 @@ interface DocArtifactItem {
   model_used: string
 }
 
+interface PipelineRunItem {
+  id: string
+  commit_sha: string
+  before_sha: string | null
+  branch: string
+  status: 'queued' | 'running' | 'success' | 'failed' | 'retrying'
+  current_stage: string
+  duration_ms: number | null
+  error_message: string | null
+  trigger_type: string
+  created_at: string
+  retry_count: number
+}
+
+function getStageBadge(status: PipelineRunItem['status']) {
+  switch (status) {
+    case 'success': return 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+    case 'running': return 'bg-blue-500/10 text-blue-400 border-blue-500/20'
+    case 'queued': return 'bg-slate-500/10 text-slate-400 border-slate-500/20'
+    case 'retrying': return 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+    case 'failed': return 'bg-red-500/10 text-red-400 border-red-500/20'
+    default: return 'bg-slate-500/10 text-slate-400 border-slate-500/20'
+  }
+}
+
 const LANG_COLORS: Record<string, string> = {
   TypeScript: '#3178c6',
   JavaScript: '#f1e05a',
@@ -94,8 +119,8 @@ export default function RepositoryDetailPage() {
   const [activeTriggerSha, setActiveTriggerSha] = useState<string | 'header' | null>(null)
   const isRunningAny = activeTriggerSha !== null
 
-  // Tabs: 'tree' | 'commits' | 'languages' | 'docs'
-  const [activeTab, setActiveTab] = useState<'tree' | 'commits' | 'languages' | 'docs'>('tree')
+  // Tabs: 'tree' | 'commits' | 'languages' | 'docs' | 'pipeline'
+  const [activeTab, setActiveTab] = useState<'tree' | 'commits' | 'languages' | 'docs' | 'pipeline'>('tree')
 
   // Tab Data States
   const [languages, setLanguages] = useState<LanguageItem[]>([])
@@ -111,6 +136,11 @@ export default function RepositoryDetailPage() {
   const [docArtifacts, setDocArtifacts] = useState<DocArtifactItem[]>([])
   const [selectedArtifactId, setSelectedArtifactId] = useState<string | null>(null)
   const [loadingDocs, setLoadingDocs] = useState(false)
+
+  // Pipeline Runs States
+  const [pipelineRuns, setPipelineRuns] = useState<PipelineRunItem[]>([])
+  const [loadingPipeline, setLoadingPipeline] = useState(false)
+  const [backfillingAll, setBackfillingAll] = useState(false)
 
   // Directory navigation state
   const [currentDir, setCurrentDir] = useState<string>('')
@@ -150,7 +180,7 @@ export default function RepositoryDetailPage() {
 
   // 2. Fetch Tab Data helper
   const loadTabData = useCallback(
-    (tab: 'tree' | 'commits' | 'languages' | 'docs', force = false) => {
+    (tab: 'tree' | 'commits' | 'languages' | 'docs' | 'pipeline', force = false) => {
       if (!id) return
 
       if (!force) {
@@ -189,6 +219,21 @@ export default function RepositoryDetailPage() {
         return
       }
 
+      if (tab === 'pipeline') {
+        setLoadingPipeline(true)
+        api
+          .get<{ success: boolean; data: { runs: PipelineRunItem[]; total: number } }>(
+            `/pipeline-runs?repositoryId=${id}&limit=20`,
+          )
+          .then((res) => setPipelineRuns(res.data.data.runs ?? []))
+          .catch(() => toast.error('Failed to load pipeline runs'))
+          .finally(() => {
+            setLoadingTab(false)
+            setLoadingPipeline(false)
+          })
+        return
+      }
+
       api
         .get<{ success: boolean; data: any }>(`/repositories/${id}/${tab}`)
         .then((res) => {
@@ -207,7 +252,7 @@ export default function RepositoryDetailPage() {
     [id, tree.length, commits.length, languages.length, docArtifacts.length],
   )
 
-  function handleTabChange(tab: 'tree' | 'commits' | 'languages' | 'docs') {
+  function handleTabChange(tab: 'tree' | 'commits' | 'languages' | 'docs' | 'pipeline') {
     setActiveTab(tab)
     loadTabData(tab)
   }
@@ -219,6 +264,25 @@ export default function RepositoryDetailPage() {
       loadTabData('languages')
     }
   }, [repo, id, loadTabData])
+
+  // 3. Pipeline polling — auto-refresh every 4 seconds when active runs exist on pipeline tab
+  useEffect(() => {
+    if (activeTab !== 'pipeline') return
+    const hasActive = pipelineRuns.some((r) => r.status === 'queued' || r.status === 'running')
+    if (!hasActive) return
+
+    const interval = setInterval(() => {
+      if (!id) return
+      api
+        .get<{ success: boolean; data: { runs: PipelineRunItem[] } }>(
+          `/pipeline-runs?repositoryId=${id}&limit=20`,
+        )
+        .then((res) => setPipelineRuns(res.data.data.runs ?? []))
+        .catch(() => {})
+    }, 4000)
+
+    return () => clearInterval(interval)
+  }, [activeTab, pipelineRuns, id])
 
   async function handleRefresh() {
     if (!id) return
@@ -507,6 +571,21 @@ export default function RepositoryDetailPage() {
           }`}
         >
           <span>🧠</span> Generated Docs ({docArtifacts.length})
+        </button>
+        <button
+          type="button"
+          onClick={() => handleTabChange('pipeline')}
+          className={`px-5 py-3 text-sm font-semibold border-b-2 transition-colors duration-150 flex items-center gap-2 ${
+            activeTab === 'pipeline'
+              ? 'border-brand-500 text-brand-300'
+              : 'border-transparent text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          <span>⚙️</span> Pipeline
+          {pipelineRuns.filter((r) => r.status === 'queued' || r.status === 'running').length > 0 && (
+            <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" />
+          )}
+          ({pipelineRuns.length})
         </button>
       </div>
 
@@ -845,7 +924,7 @@ export default function RepositoryDetailPage() {
             </div>
           )}
         </div>
-      ) : (
+      ) : activeTab === 'languages' ? (
         /* 📊 Languages Table View */
         <div className="glass-card p-6">
           <div className="divide-y divide-white/5">
@@ -868,7 +947,131 @@ export default function RepositoryDetailPage() {
             ))}
           </div>
         </div>
-      )}
+      ) : activeTab === 'pipeline' ? (
+        /* ⚙️ Pipeline Runs Tab */
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-sm font-semibold text-slate-200">Pipeline Run History</h2>
+              <p className="text-xs text-slate-500 mt-0.5">Auto-triggers on every push. Live-polls active runs every 4 seconds.</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                disabled={isRunningAny || backfillingAll}
+                onClick={async () => {
+                  if (!id || commits.length === 0) { toast.error('Load commits first'); return }
+                  setBackfillingAll(true)
+                  let count = 0
+                  for (const c of commits) {
+                    try {
+                      await api.post(`/repositories/${id}/trigger-pipeline`, { commitSha: c.sha })
+                      count++
+                    } catch { /* skip already-queued */ }
+                  }
+                  toast.success(`Queued ${count} pipeline run${count !== 1 ? 's' : ''} for existing commits`)
+                  setBackfillingAll(false)
+                  loadTabData('pipeline', true)
+                }}
+                className="btn-secondary text-xs py-1.5 px-3 flex items-center gap-1.5 disabled:opacity-50"
+                title="Generate docs for all recent commits in history"
+              >
+                <span className={backfillingAll ? 'animate-spin inline-block' : ''}>📂</span>
+                {backfillingAll ? 'Queuing…' : 'Backfill All Commits'}
+              </button>
+              <button
+                type="button"
+                disabled={isRunningAny}
+                onClick={() => { void handleTriggerPipeline() }}
+                className="btn-primary text-xs py-1.5 px-3 flex items-center gap-1.5 disabled:opacity-50"
+              >
+                <span className={activeTriggerSha === 'header' ? 'animate-spin inline-block' : ''}>⚡</span>
+                {activeTriggerSha === 'header' ? 'Running…' : 'Run Pipeline Now'}
+              </button>
+              <button
+                type="button"
+                onClick={() => loadTabData('pipeline', true)}
+                className="btn-secondary text-xs py-1.5 px-3"
+              >
+                ↻ Refresh
+              </button>
+            </div>
+          </div>
+
+          {loadingPipeline ? (
+            <div className="flex justify-center py-16">
+              <div className="w-8 h-8 rounded-full border-2 border-brand-500 border-t-transparent animate-spin" />
+            </div>
+          ) : pipelineRuns.length === 0 ? (
+            <div className="glass-card p-12 text-center">
+              <div className="w-12 h-12 mx-auto mb-4 rounded-full bg-brand-500/10 text-brand-400 flex items-center justify-center text-xl">
+                ⚙️
+              </div>
+              <h3 className="text-base font-semibold text-slate-200 mb-1">No Pipeline Runs Yet</h3>
+              <p className="text-xs text-slate-400 max-w-md mx-auto mb-6">
+                Pipeline runs are created automatically on every GitHub push. You can also trigger one manually.
+              </p>
+              <button
+                type="button"
+                disabled={isRunningAny}
+                onClick={() => { void handleTriggerPipeline() }}
+                className="btn-primary text-xs inline-flex items-center gap-1.5"
+              >
+                <span>⚡</span> Trigger Pipeline Now
+              </button>
+            </div>
+          ) : (
+            <div className="glass-card overflow-hidden">
+              <table className="w-full text-xs text-left" aria-label="Pipeline run history">
+                <thead>
+                  <tr className="border-b border-white/8 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
+                    <th className="px-4 py-3">Commit</th>
+                    <th className="px-4 py-3">Branch</th>
+                    <th className="px-4 py-3">Status</th>
+                    <th className="px-4 py-3">Stage</th>
+                    <th className="px-4 py-3">Trigger</th>
+                    <th className="px-4 py-3">Duration</th>
+                    <th className="px-4 py-3 text-right">Started</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/5">
+                  {pipelineRuns.map((run) => (
+                    <tr key={run.id} className="hover:bg-white/3 transition-colors">
+                      <td className="px-4 py-3 font-mono font-bold text-brand-400">
+                        {run.commit_sha.slice(0, 7)}
+                      </td>
+                      <td className="px-4 py-3 text-slate-300 font-mono">{run.branch}</td>
+                      <td className="px-4 py-3">
+                        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border uppercase ${getStageBadge(run.status)}`}>
+                          {run.status === 'running' ? (
+                            <span className="flex items-center gap-1">
+                              <span className="w-1.5 h-1.5 rounded-full bg-current animate-pulse" />
+                              {run.status}
+                            </span>
+                          ) : run.status}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-slate-400 capitalize">{run.current_stage}</td>
+                      <td className="px-4 py-3">
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/5 text-slate-500 font-mono">
+                          {run.trigger_type}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-slate-500">
+                        {run.duration_ms !== null ? `${(run.duration_ms / 1000).toFixed(1)}s` : '—'}
+                      </td>
+                      <td className="px-4 py-3 text-slate-600 text-right font-sans">
+                        {new Date(run.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      ) : null}
+
 
       {/* Selected File Viewer Modal */}
       {selectedFilePath && (

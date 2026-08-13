@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import Nav from './Nav'
 import UserMenu from '../UserMenu'
 import AuthButton from '../AuthButton'
+import NotificationBell from '../NotificationBell'
 import { useAuthStore } from '../../store/authStore'
 
 /**
@@ -41,6 +42,9 @@ export default function Header() {
           <div className="flex items-center gap-3">
             <Nav />
 
+            {/* Notification Bell — authenticated only */}
+            {isAuthenticated && <NotificationBell />}
+
             {/* Auth control */}
             {isLoading ? (
               <div className="w-8 h-8 rounded-full bg-white/5 animate-pulse" aria-label="Loading" />
@@ -55,3 +59,4 @@ export default function Header() {
     </header>
   )
 }
+

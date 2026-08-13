@@ -4,6 +4,7 @@ import { updateStageProgress, completePipelineRun } from '../pipeline/pipeline.s
 import { checkoutRepository, cleanupWorkspace, getWorkspacePath } from '../git/git.service'
 import { generateChangeSet } from '../git/diff.service'
 import { generateAndPersistDocumentation } from '../docgen/docgen.service'
+import { createNotification } from '../notifications/notifications.service'
 import type { DocumentationPipelineJob } from '../pipeline/pipeline.types'
 import { logger } from '../logger'
 
@@ -104,6 +105,29 @@ export async function processPipelineJob(job: Job<DocumentationPipelineJob>): Pr
       changeset,
     })
 
+    // Notify user: pipeline success + docs generated
+    const userId = data.triggeredBy ?? repoRecord.user_id
+    void createNotification({
+      userId,
+      repositoryId: data.repositoryId,
+      pipelineRunId: runId,
+      type: 'pipeline_success',
+      title: `Pipeline succeeded — ${data.owner}/${data.repo}`,
+      body: `Change detection & documentation pipeline for commit ${data.afterSha.slice(0, 7)} on \`${data.branch}\` completed successfully.`,
+      commitSha: data.afterSha,
+      branch: data.branch,
+    })
+    void createNotification({
+      userId,
+      repositoryId: data.repositoryId,
+      pipelineRunId: runId,
+      type: 'docs_generated',
+      title: `Docs generated — ${data.owner}/${data.repo}`,
+      body: `New documentation artifacts were generated for commit ${data.afterSha.slice(0, 7)}. Open the Generated Docs tab to view them.`,
+      commitSha: data.afterSha,
+      branch: data.branch,
+    })
+
     logger.info(
       { pipelineRunId: runId, filesChanged: changeset.files.length },
       'Pipeline run & Phase 4 documentation generation completed successfully',
@@ -118,6 +142,21 @@ export async function processPipelineJob(job: Job<DocumentationPipelineJob>): Pr
       status: 'failed',
       errorMessage,
     }).catch(() => {})
+
+    // Notify user: pipeline failed — use data.triggeredBy from job payload
+    const failedUserId = data.triggeredBy
+    if (failedUserId) {
+      void createNotification({
+        userId: failedUserId,
+        repositoryId: data.repositoryId,
+        pipelineRunId: runId,
+        type: 'pipeline_failed',
+        title: `Pipeline failed — ${data.owner}/${data.repo}`,
+        body: `Pipeline for commit ${data.afterSha.slice(0, 7)} on \`${data.branch}\` failed: ${errorMessage.slice(0, 120)}`,
+        commitSha: data.afterSha,
+        branch: data.branch,
+      })
+    }
 
     throw err // Re-throw so BullMQ handles retry/attempts
   } finally {

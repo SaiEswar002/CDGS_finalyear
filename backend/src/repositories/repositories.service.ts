@@ -360,6 +360,7 @@ export async function triggerPipelineForRepo(
       branch,
       beforeSha,
       afterSha,
+      triggeredBy: userId,
     })
   } catch (err: any) {
     logger.error({ err: err?.message, runId: pipelineRun.id }, 'Failed to enqueue pipeline job')
@@ -376,11 +377,14 @@ export async function triggerPipelineForRepo(
 
   // Update repository last_synced_at timestamp
   const supabase = getSupabaseClient()
-  await supabase
-    .from('repositories')
-    .update({ last_synced_at: new Date().toISOString() })
-    .eq('id', repo.id)
-    .catch(() => {})
+  try {
+    await supabase
+      .from('repositories')
+      .update({ last_synced_at: new Date().toISOString() })
+      .eq('id', repo.id)
+  } catch {
+    // Non-critical: ignore timestamp update failures
+  }
 
   return pipelineRun
 }

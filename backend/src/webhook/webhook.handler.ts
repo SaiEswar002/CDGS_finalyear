@@ -4,6 +4,7 @@ import type { GitHubPushPayload } from './webhook.types'
 import { getSupabaseClient } from '../db/supabaseClient'
 import { createPipelineRun } from '../pipeline/pipeline.service'
 import { enqueuePipelineJob } from '../queue/queue.service'
+import { createNotification } from '../notifications/notifications.service'
 import { logger } from '../logger'
 
 /**
@@ -99,6 +100,17 @@ export async function githubWebhookHandler(req: Request, res: Response): Promise
     return
   }
 
+  // Notify user: push received
+  void createNotification({
+    userId: repoRecord.user_id,
+    repositoryId: repoRecord.id,
+    type: 'push_received',
+    title: `Push received — ${repoRecord.owner}/${repoRecord.name}`,
+    body: `New commit ${afterSha.slice(0, 7)} pushed to \`${branch}\`. Documentation pipeline is queuing.`,
+    commitSha: afterSha,
+    branch,
+  })
+
   // 7. Create pipeline run (idempotent — returns existing run if already queued/running)
   let pipelineRun
   try {
@@ -127,6 +139,7 @@ export async function githubWebhookHandler(req: Request, res: Response): Promise
       branch,
       beforeSha,
       afterSha,
+      triggeredBy: repoRecord.user_id,
     })
   } catch (err: any) {
     logger.error({ err: err.message, pipelineRunId: pipelineRun.id }, 'Failed to enqueue pipeline job')
@@ -138,6 +151,18 @@ export async function githubWebhookHandler(req: Request, res: Response): Promise
     })
     return
   }
+
+  // Notify user: pipeline queued
+  void createNotification({
+    userId: repoRecord.user_id,
+    repositoryId: repoRecord.id,
+    pipelineRunId: pipelineRun.id,
+    type: 'pipeline_queued',
+    title: `Pipeline queued — ${repoRecord.owner}/${repoRecord.name}`,
+    body: `Documentation pipeline for commit ${afterSha.slice(0, 7)} on \`${branch}\` is now running.`,
+    commitSha: afterSha,
+    branch,
+  })
 
   logger.info(
     { pipelineRunId: pipelineRun.id, owner, repo, branch, afterSha: afterSha.slice(0, 7) },

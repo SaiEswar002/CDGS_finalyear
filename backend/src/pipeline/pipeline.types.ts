@@ -17,6 +17,7 @@ export interface DocumentationPipelineJob {
   branch: string
   beforeSha: string
   afterSha: string
+  triggeredBy?: string  // userId who triggered (for notifications)
 }
 
 /** Shared Contract #2: ChangeSet Output (Lokesh produces, Eswar stores, Phase 4 consumes) */

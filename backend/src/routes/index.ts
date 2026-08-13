@@ -5,6 +5,7 @@ import { repositoriesRouter } from '../repositories/repositories.router'
 import { githubRouter } from '../github/github.router'
 import { pipelineRouter } from '../pipeline/pipeline.router'
 import { webhookRouter } from '../webhook/webhook.router'
+import { notificationsRouter } from '../notifications/notifications.router'
 
 /**
  * Root API router.
@@ -32,5 +33,6 @@ apiRouter.use('/github', githubRouter)
 apiRouter.use('/repositories', repositoriesRouter)
 apiRouter.use('/pipeline-runs', pipelineRouter)
 apiRouter.use('/webhooks', webhookRouter)
+apiRouter.use('/notifications', notificationsRouter)
 
 
