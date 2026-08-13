@@ -91,6 +91,8 @@ export default function RepositoryDetailPage() {
   const [loading, setLoading] = useState(true)
   const [deleting, setDeleting] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
+  const [activeTriggerSha, setActiveTriggerSha] = useState<string | 'header' | null>(null)
+  const isRunningAny = activeTriggerSha !== null
 
   // Tabs: 'tree' | 'commits' | 'languages' | 'docs'
   const [activeTab, setActiveTab] = useState<'tree' | 'commits' | 'languages' | 'docs'>('tree')
@@ -256,6 +258,25 @@ export default function RepositoryDetailPage() {
     }
   }
 
+  async function handleTriggerPipeline(commitSha?: string) {
+    if (!id) return
+    setActiveTriggerSha(commitSha || 'header')
+    try {
+      const res = await api.post<{ success: boolean; message: string }>(`/repositories/${id}/trigger-pipeline`, {
+        commitSha,
+      })
+      toast.success(res.data.message || 'Pipeline run triggered successfully!')
+      setActiveTab('docs')
+      setTimeout(() => {
+        loadTabData('docs', true)
+      }, 2500)
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Failed to trigger pipeline run.')
+    } finally {
+      setActiveTriggerSha(null)
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex justify-center py-24">
@@ -338,6 +359,16 @@ export default function RepositoryDetailPage() {
         </div>
 
         <div className="flex items-center gap-3 shrink-0">
+          <button
+            type="button"
+            disabled={isRunningAny}
+            onClick={() => { void handleTriggerPipeline() }}
+            className="btn-primary !py-2 !px-4 !text-sm flex items-center gap-1.5 disabled:opacity-50"
+          >
+            <span className={activeTriggerSha === 'header' ? 'animate-spin inline-block' : ''}>⚡</span>
+            {activeTriggerSha === 'header' ? 'Running Pipeline…' : 'Run Pipeline & Build Docs'}
+          </button>
+
           <button
             type="button"
             disabled={refreshing}
@@ -634,16 +665,30 @@ export default function RepositoryDetailPage() {
                     </div>
                   </div>
 
-                  <a
-                    href={c.html_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="shrink-0 px-2.5 py-1 rounded-md bg-white/5 hover:bg-white/10
-                               font-mono text-xs text-brand-400 border border-brand-500/20
-                               transition-colors"
-                  >
-                    {c.sha.slice(0, 7)} ↗
-                  </a>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      disabled={isRunningAny}
+                      onClick={() => { void handleTriggerPipeline(c.sha) }}
+                      className="px-2.5 py-1 rounded-md bg-brand-500/10 hover:bg-brand-500/20
+                                 font-sans text-xs text-brand-300 border border-brand-500/30
+                                 transition-colors flex items-center gap-1 disabled:opacity-50 font-medium"
+                      title="Run pipeline and generate docs for this committed push"
+                    >
+                      <span className={activeTriggerSha === c.sha ? 'animate-spin inline-block' : ''}>⚡</span>
+                      {activeTriggerSha === c.sha ? 'Building…' : 'Build Docs'}
+                    </button>
+                    <a
+                      href={c.html_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-2.5 py-1 rounded-md bg-white/5 hover:bg-white/10
+                                 font-mono text-xs text-brand-400 border border-brand-500/20
+                                 transition-colors"
+                    >
+                      {c.sha.slice(0, 7)} ↗
+                    </a>
+                  </div>
                 </div>
               ))}
             </div>
@@ -708,13 +753,24 @@ export default function RepositoryDetailPage() {
               <p className="text-xs text-slate-400 max-w-md mx-auto mb-6">
                 Push code to this repository to automatically trigger Phase 3 change detection & Phase 4 documentation generation.
               </p>
-              <button
-                type="button"
-                onClick={() => loadTabData('docs', true)}
-                className="btn-secondary text-xs inline-flex items-center gap-1.5"
-              >
-                🔄 Refresh Docs
-              </button>
+              <div className="flex items-center justify-center gap-3">
+                <button
+                  type="button"
+                  disabled={isRunningAny}
+                  onClick={() => { void handleTriggerPipeline() }}
+                  className="btn-primary text-xs inline-flex items-center gap-1.5"
+                >
+                  <span className={activeTriggerSha === 'header' ? 'animate-spin inline-block' : ''}>⚡</span>
+                  {activeTriggerSha === 'header' ? 'Running Pipeline…' : 'Run Pipeline & Generate Docs'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => loadTabData('docs', true)}
+                  className="btn-secondary text-xs inline-flex items-center gap-1.5"
+                >
+                  🔄 Refresh Docs
+                </button>
+              </div>
             </div>
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">

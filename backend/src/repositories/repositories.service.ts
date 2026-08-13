@@ -1,6 +1,8 @@
 import { getSupabaseClient } from '../db/supabaseClient'
 import { getEncryptedTokenForUser } from '../auth/auth.service'
 import { getRepository as getGitHubRepo } from '../github/service'
+import { createPipelineRun } from '../pipeline/pipeline.service'
+import { enqueuePipelineJob } from '../queue/queue.service'
 import { HttpError } from '../middleware/errorHandler'
 import { logger } from '../logger'
 import type { ImportRepositoryBody } from './repositories.schema'
@@ -110,6 +112,12 @@ export async function importRepository(
 
   const repo = data as unknown as Repository
   logger.info({ userId, repoId: repo.id, fullName: repo.full_name }, 'Repository imported')
+
+  // Auto-trigger initial pipeline run in background
+  triggerPipelineForRepo(userId, repo.id).catch((err: any) => {
+    logger.warn({ err: err?.message, repoId: repo.id }, 'Auto pipeline trigger on import failed')
+  })
+
   return repo
 }
 
@@ -286,5 +294,119 @@ export async function getRepositoryFileService(
 
   return { file, editUrl }
 }
+
+/**
+ * Triggers a manual pipeline run for a specific repository and commit SHA.
+ * If commitSha is omitted, fetches the latest commit from GitHub.
+ */
+export async function triggerPipelineForRepo(
+  userId: string,
+  repoId: string,
+  commitSha?: string,
+) {
+  const repo = await getRepository(userId, repoId)
+  const branch = repo.selected_branch ?? repo.default_branch ?? 'main'
+
+  let afterSha = commitSha
+  let beforeSha = '0000000000000000000000000000000000000000'
+
+  if (commitSha) {
+    // If commitSha is explicitly supplied (e.g. from commit list UI), look up parent commit SHA if available
+    try {
+      const { commits } = await getRepositoryCommitsService(userId, repoId)
+      if (commits && commits.length > 0) {
+        const index = commits.findIndex((c: any) => c.sha === commitSha)
+        if (index >= 0 && index + 1 < commits.length) {
+          beforeSha = commits[index + 1].sha
+        }
+      }
+    } catch {
+      // fallback to null sha / empty tree
+    }
+  } else {
+    try {
+      const { commits } = await getRepositoryCommitsService(userId, repoId)
+      if (commits && commits.length > 0) {
+        afterSha = commits[0].sha
+        if (commits.length > 1) {
+          beforeSha = commits[1].sha
+        }
+      }
+    } catch (err: any) {
+      logger.warn({ err: err?.message, repoId }, 'Failed to fetch commits for pipeline trigger, using branch reference')
+    }
+  }
+
+  if (!afterSha) {
+    throw new HttpError(400, 'NO_COMMIT_FOUND', 'No commit SHA could be resolved for this repository.')
+  }
+
+  const pipelineRun = await createPipelineRun({
+    repositoryId: repo.id,
+    commitSha: afterSha,
+    beforeSha,
+    branch,
+    triggeredBy: userId,
+    triggerType: 'manual',
+  })
+
+  try {
+    await enqueuePipelineJob({
+      pipelineRunId: pipelineRun.id,
+      repositoryId: repo.id,
+      githubRepositoryId: repo.github_repo_id,
+      owner: repo.owner,
+      repo: repo.name,
+      branch,
+      beforeSha,
+      afterSha,
+    })
+  } catch (err: any) {
+    logger.error({ err: err?.message, runId: pipelineRun.id }, 'Failed to enqueue pipeline job')
+    const { updateStageProgress } = await import('../pipeline/pipeline.service')
+    await updateStageProgress({
+      runId: pipelineRun.id,
+      stage: 'webhook',
+      status: 'failed',
+      errorMessage: `Failed to enqueue job: ${err?.message || 'Queue connection error'}`,
+    }).catch(() => {})
+
+    throw new HttpError(500, 'QUEUE_ERROR', `Failed to enqueue pipeline job: ${err?.message || 'Queue error'}`)
+  }
+
+  // Update repository last_synced_at timestamp
+  const supabase = getSupabaseClient()
+  await supabase
+    .from('repositories')
+    .update({ last_synced_at: new Date().toISOString() })
+    .eq('id', repo.id)
+    .catch(() => {})
+
+  return pipelineRun
+}
+
+/**
+ * Triggers a manual pipeline run for all active repositories owned by the user.
+ */
+export async function triggerPipelineForAllRepos(userId: string) {
+  const repos = await listRepositories(userId)
+  const results: Array<{ repositoryId: string; repoName: string; success: boolean; runId?: string; error?: string }> = []
+
+  for (const repo of repos) {
+    try {
+      const run = await triggerPipelineForRepo(userId, repo.id)
+      results.push({ repositoryId: repo.id, repoName: repo.full_name, success: true, runId: run.id })
+    } catch (err: any) {
+      results.push({ repositoryId: repo.id, repoName: repo.full_name, success: false, error: err?.message || 'Failed' })
+    }
+  }
+
+  return {
+    triggeredCount: results.filter((r) => r.success).length,
+    totalRepos: repos.length,
+    results,
+  }
+}
+
 
 

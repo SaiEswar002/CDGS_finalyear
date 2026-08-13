@@ -55,6 +55,23 @@ export async function generateAndPersistDocumentation(
 
   const newVersionNumber = (latestVersion?.version_number || 0) + 1
 
+  // Ensure runId exists in documentation_runs table for backwards-compatible DB schemas
+  try {
+    await supabase
+      .from('documentation_runs')
+      .upsert(
+        {
+          id: runId,
+          repository_id: repositoryId,
+          trigger_type: 'manual',
+          commit_sha: commitSha,
+          status: 'running',
+        },
+      )
+  } catch (err: unknown) {
+    logger.debug({ err, runId }, 'Optional documentation_runs upsert skipped')
+  }
+
   // Insert documentation_versions record
   const { data: versionRecord, error: versionErr } = await supabase
     .from('documentation_versions')
@@ -71,26 +88,28 @@ export async function generateAndPersistDocumentation(
 
   if (versionErr || !versionRecord) {
     logger.error({ err: versionErr }, 'Failed to insert documentation_version record')
+    throw new Error(`Failed to persist documentation_version record: ${versionErr?.message || 'DB Error'}`)
   }
 
   // Insert individual documents
-  if (versionRecord) {
-    for (const doc of generatedDocs) {
-      try {
-        await supabase.from('documents').insert({
-          version_id: versionRecord.id,
-          repository_id: repositoryId,
-          file_path: doc.filePath,
-          doc_type: doc.docType,
-          title: doc.title,
-          content: doc.content,
-          content_hash: doc.contentHash,
-          ai_model: aiResult.modelUsed,
-          token_count: aiResult.tokensUsed,
-        })
-      } catch (err: unknown) {
-        logger.warn({ err, file: doc.filePath }, 'Failed to insert document artifact')
+  for (const doc of generatedDocs) {
+    try {
+      const { error: docErr } = await supabase.from('documents').insert({
+        version_id: versionRecord.id,
+        repository_id: repositoryId,
+        file_path: doc.filePath,
+        doc_type: doc.docType,
+        title: doc.title || doc.filePath,
+        content: doc.content || '',
+        content_hash: doc.contentHash || 'hash',
+        ai_model: aiResult.modelUsed,
+        token_count: aiResult.tokensUsed,
+      })
+      if (docErr) {
+        logger.warn({ err: docErr, file: doc.filePath }, 'Failed to insert document artifact')
       }
+    } catch (err: unknown) {
+      logger.warn({ err, file: doc.filePath }, 'Failed to insert document artifact')
     }
   }
 

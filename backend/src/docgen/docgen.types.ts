@@ -35,7 +35,7 @@ export interface ExtractedSymbol {
 /** Analyzed code file result */
 export interface ParsedCodeFile {
   filePath: string
-  language: 'typescript' | 'javascript' | 'python' | 'sql' | 'markdown' | 'other'
+  language: 'typescript' | 'javascript' | 'python' | 'java' | 'go' | 'rust' | 'csharp' | 'cpp' | 'sql' | 'markdown' | 'other'
   symbols: ExtractedSymbol[]
   hasSwaggerAnnotations: boolean
 }

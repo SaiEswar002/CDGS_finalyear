@@ -40,6 +40,7 @@ export async function runGitCommand(
   args: string[],
   cwd: string,
   timeoutMs: number = 60000,
+  logError: boolean = true,
 ): Promise<{ stdout: string; stderr: string }> {
   try {
     const result = await execFileAsync('git', args, {
@@ -57,7 +58,9 @@ export async function runGitCommand(
   } catch (err: any) {
     const sanitizedMsg = sanitizeGitOutput(err.message || 'Git command failed')
     const sanitizedStderr = sanitizeGitOutput(err.stderr || '')
-    logger.error({ args: args.map(sanitizeGitOutput), err: sanitizedMsg }, 'Git command failed')
+    if (logError) {
+      logger.error({ args: args.map(sanitizeGitOutput), err: sanitizedMsg }, 'Git command failed')
+    }
     const error = new Error(`Git error: ${sanitizedMsg}\n${sanitizedStderr}`)
     throw error
   }
@@ -68,8 +71,11 @@ export async function runGitCommand(
  * (§19 Shallow Clone / History Safety)
  */
 export async function verifyCommitExists(workspaceDir: string, commitSha: string): Promise<boolean> {
+  if (!commitSha || commitSha === '0000000000000000000000000000000000000000' || !/^[0-9a-fA-F]{40}$/.test(commitSha)) {
+    return false
+  }
   try {
-    await runGitCommand(['cat-file', '-e', `${commitSha}^{commit}`], workspaceDir)
+    await runGitCommand(['cat-file', '-e', `${commitSha}^{commit}`], workspaceDir, 60000, false)
     return true
   } catch {
     return false
@@ -122,7 +128,7 @@ export async function checkoutRepository(
     let afterExists = await verifyCommitExists(repoDir, options.afterSha)
     if (!afterExists) {
       logger.info({ afterSha: options.afterSha }, 'Fetching afterSha commit')
-      await runGitCommand(['fetch', 'origin', options.afterSha], repoDir, timeoutMs)
+      await runGitCommand(['fetch', 'origin', options.afterSha], repoDir, timeoutMs, false)
       afterExists = await verifyCommitExists(repoDir, options.afterSha)
     }
 
@@ -131,16 +137,19 @@ export async function checkoutRepository(
     }
 
     // 4. Verify beforeSha exists (§19)
-    let beforeExists = await verifyCommitExists(repoDir, options.beforeSha)
-    if (!beforeExists && options.beforeSha && options.beforeSha !== '0000000000000000000000000000000000000000') {
-      logger.info({ beforeSha: options.beforeSha }, 'Fetching beforeSha commit')
-      try {
-        await runGitCommand(['fetch', 'origin', options.beforeSha], repoDir, timeoutMs)
-      } catch {
-        // Fallback: fetch full history
-        await runGitCommand(['fetch', '--unshallow'], repoDir, timeoutMs).catch(() => {})
-      }
+    let beforeExists = false
+    if (options.beforeSha && options.beforeSha !== '0000000000000000000000000000000000000000') {
       beforeExists = await verifyCommitExists(repoDir, options.beforeSha)
+      if (!beforeExists) {
+        logger.info({ beforeSha: options.beforeSha }, 'Fetching beforeSha commit')
+        try {
+          await runGitCommand(['fetch', 'origin', options.beforeSha], repoDir, timeoutMs, false)
+        } catch {
+          // Fallback: fetch full history
+          await runGitCommand(['fetch', '--unshallow'], repoDir, timeoutMs, false).catch(() => {})
+        }
+        beforeExists = await verifyCommitExists(repoDir, options.beforeSha)
+      }
     }
 
     // If beforeSha is null, 000... (initial commit), or unresolvable, fall back to initial commit / empty tree SHA

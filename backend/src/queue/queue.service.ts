@@ -40,8 +40,10 @@ export async function enqueuePipelineJob(job: DocumentationPipelineJob) {
     'Enqueueing DocumentationPipelineJob into BullMQ',
   )
 
+  const uniqueJobId = `${job.pipelineRunId}-${Date.now()}`
+
   return queue.add('documentation-pipeline-job', job, {
-    jobId: job.pipelineRunId, // Canonical identity: jobId === pipelineRunId
+    jobId: uniqueJobId, // Unique job ID per enqueue execution
   })
 }
 

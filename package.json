@@ -7,7 +7,7 @@
     "dev:frontend": "npm --prefix frontend run dev",
     "dev:worker": "npx wait-on tcp:6379 -t 60000 && npm --prefix backend run worker:dev",
     "dev:tunnel": "ngrok http http://127.0.0.1:3000 --url=fairly-unfertilising-rank.ngrok-free.dev",
-    "dev:redis": "\"C:\\Users\\saies\\AppData\\Local\\Microsoft\\WinGet\\Packages\\taizod1024.redis-windows-fork_Microsoft.Winget.Source_8wekyb3d8bbwe\\Redis-8.8.0-Windows-x64-msys2\\redis-server.exe\"",
+    "dev:redis": "node scripts/start-redis.js",
     "dev": "concurrently -n \"REDIS,BACKEND,FRONTEND,WORKER,TUNNEL\" -c \"red,blue,magenta,yellow,cyan\" \"npm run dev:redis\" \"npm run dev:backend\" \"npm run dev:frontend\" \"npm run dev:worker\" \"npm run dev:tunnel\"",
     "build:backend": "npm --prefix backend run build",
     "build:frontend": "npm --prefix frontend run build",

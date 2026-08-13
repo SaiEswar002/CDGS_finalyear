@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
+import toast from 'react-hot-toast'
 import { api } from '../lib/api'
 
 export interface PipelineRunItem {
@@ -35,40 +36,81 @@ function getStatusBadge(status: PipelineRunItem['status']) {
 export default function PipelineRunsTable() {
   const [runs, setRuns] = useState<PipelineRunItem[]>([])
   const [loading, setLoading] = useState(true)
+  const [triggeringAll, setTriggeringAll] = useState(false)
 
-  function fetchRuns() {
-    setLoading(true)
+  const fetchRuns = useCallback((showSpinner = true) => {
+    if (showSpinner) setLoading(true)
     api
       .get<{ success: boolean; data: { runs: PipelineRunItem[]; total: number } }>(
         '/pipeline-runs?limit=10',
       )
       .then((res) => setRuns(res.data.data.runs ?? []))
       .catch(() => setRuns([]))
-      .finally(() => setLoading(false))
-  }
+      .finally(() => {
+        if (showSpinner) setLoading(false)
+      })
+  }, [])
 
   useEffect(() => {
-    fetchRuns()
-  }, [])
+    fetchRuns(true)
+  }, [fetchRuns])
+
+  // Poll active runs every 3 seconds if any run is active
+  useEffect(() => {
+    const hasActiveRun = runs.some((r) => r.status === 'queued' || r.status === 'running')
+    if (!hasActiveRun) return
+
+    const interval = setInterval(() => {
+      fetchRuns(false)
+    }, 3000)
+
+    return () => clearInterval(interval)
+  }, [runs, fetchRuns])
+
+  async function handleTriggerAllPipelines() {
+    setTriggeringAll(true)
+    try {
+      const res = await api.post<{ success: boolean; message: string }>('/repositories/trigger-all')
+      toast.success(res.data.message || 'Triggered pipeline runs for all repositories!')
+      fetchRuns(true)
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Failed to trigger pipelines.')
+    } finally {
+      setTriggeringAll(false)
+    }
+  }
 
   return (
     <div className="glass-card p-6">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
         <div>
           <h2 className="text-xl font-extrabold text-slate-100 mb-1">Recent Pipeline Runs</h2>
           <p className="text-xs text-slate-400">
             Real-time change detection & processing history across your repositories.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={fetchRuns}
-          disabled={loading}
-          className="btn-secondary !py-1.5 !px-3 !text-xs flex items-center gap-1.5"
-        >
-          <span className={loading ? 'animate-spin inline-block' : ''}>↻</span>
-          Refresh
-        </button>
+
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            disabled={triggeringAll}
+            onClick={() => { void handleTriggerAllPipelines() }}
+            className="btn-primary !py-1.5 !px-3 !text-xs flex items-center gap-1.5 disabled:opacity-50"
+          >
+            <span className={triggeringAll ? 'animate-spin inline-block' : ''}>⚡</span>
+            {triggeringAll ? 'Triggering…' : 'Run Pipeline for All Repos'}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => fetchRuns(true)}
+            disabled={loading}
+            className="btn-secondary !py-1.5 !px-3 !text-xs flex items-center gap-1.5"
+          >
+            <span className={loading ? 'animate-spin inline-block' : ''}>↻</span>
+            Refresh
+          </button>
+        </div>
       </div>
 
       {loading ? (
@@ -76,8 +118,17 @@ export default function PipelineRunsTable() {
           <div className="w-6 h-6 rounded-full border-2 border-brand-500 border-t-transparent animate-spin" />
         </div>
       ) : runs.length === 0 ? (
-        <div className="py-12 text-center text-slate-500 text-sm border border-dashed border-white/10 rounded-xl">
-          No pipeline runs recorded yet. Pushing code to connected repositories will trigger runs automatically.
+        <div className="py-12 text-center text-slate-400 text-sm border border-dashed border-white/10 rounded-xl space-y-4">
+          <p>No pipeline runs recorded yet. Run pipelines for existing repos or push code to trigger runs automatically.</p>
+          <button
+            type="button"
+            disabled={triggeringAll}
+            onClick={() => { void handleTriggerAllPipelines() }}
+            className="btn-primary text-xs inline-flex items-center gap-1.5"
+          >
+            <span className={triggeringAll ? 'animate-spin inline-block' : ''}>⚡</span>
+            {triggeringAll ? 'Running Pipelines…' : '⚡ Run Pipeline for All Repositories Now'}
+          </button>
         </div>
       ) : (
         <div className="overflow-x-auto">
@@ -135,3 +186,4 @@ export default function PipelineRunsTable() {
     </div>
   )
 }
+

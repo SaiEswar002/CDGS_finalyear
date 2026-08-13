@@ -200,4 +200,52 @@ export async function getRepositoryFileHandler(
   }
 }
 
+/**
+ * POST /api/v1/repositories/:id/trigger-pipeline
+ * Trigger a manual pipeline run for a repository (optionally for a specific commitSha).
+ */
+export async function triggerPipelineHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const { triggerPipelineForRepo } = await import('./repositories.service')
+    const commitSha = req.body?.commitSha as string | undefined
+    const pipelineRun = await triggerPipelineForRepo(req.user!.id, req.params.id, commitSha)
+
+    res.status(202).json({
+      success: true,
+      message: 'Pipeline run triggered and enqueued successfully.',
+      data: { pipelineRun },
+    })
+  } catch (err) {
+    next(err)
+  }
+}
+
+/**
+ * POST /api/v1/repositories/trigger-all
+ * Trigger manual pipeline runs for all connected repositories of the user.
+ */
+export async function triggerAllPipelinesHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const { triggerPipelineForAllRepos } = await import('./repositories.service')
+    const result = await triggerPipelineForAllRepos(req.user!.id)
+
+    res.status(202).json({
+      success: true,
+      message: `Triggered ${result.triggeredCount} of ${result.totalRepos} repository pipelines.`,
+      data: result,
+    })
+  } catch (err) {
+    next(err)
+  }
+}
+
+
 

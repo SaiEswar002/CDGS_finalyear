@@ -32,19 +32,20 @@ export async function createPipelineRun(
     .select('*')
     .eq('repository_id', input.repositoryId)
     .eq('commit_sha', input.commitSha)
-    .eq('branch', input.branch)
+    .eq('branch', input.branch ?? 'main')
     .maybeSingle()
 
   if (existing) {
-    if (['queued', 'running', 'success'].includes(existing.status)) {
+    // If webhook triggered and already active/successful, skip to maintain webhook idempotency
+    if (input.triggerType !== 'manual' && ['queued', 'running', 'success'].includes(existing.status)) {
       logger.info(
         { runId: existing.id, commitSha: input.commitSha, status: existing.status },
-        'Idempotent check: pipeline run already exists in active/success state',
+        'Idempotent check: pipeline run already exists in active/success state for webhook',
       )
       return existing as unknown as PipelineRun
     }
 
-    // If previously failed, reset to queued & increment retry_count
+    // Reset run to queued & increment retry_count for manual re-execution
     const { data: updated, error: updateErr } = await supabase
       .from('pipeline_runs')
       .update({
@@ -63,12 +64,27 @@ export async function createPipelineRun(
       .single()
 
     if (updateErr || !updated) {
-      logger.error({ err: updateErr }, 'Failed to reset failed pipeline run')
-      throw new HttpError(500, 'DB_ERROR', 'Failed to update pipeline run.')
+      logger.error({ err: updateErr }, 'Failed to reset pipeline run for re-execution')
+      throw new HttpError(500, 'DB_ERROR', `Failed to update pipeline run: ${updateErr?.message || 'DB Error'}`)
     }
 
     // Log stage transition
     await logStageTransition(existing.id, 'webhook', 'queued')
+
+    // Upsert into documentation_runs for backwards-compatible DB schemas
+    try {
+      await supabase.from('documentation_runs').upsert({
+        id: existing.id,
+        repository_id: input.repositoryId,
+        triggered_by: input.triggeredBy ?? null,
+        trigger_type: input.triggerType ?? 'webhook',
+        commit_sha: input.commitSha,
+        branch: input.branch ?? 'main',
+        status: 'queued',
+      })
+    } catch {
+      // Optional fallback
+    }
 
     return updated as unknown as PipelineRun
   }
@@ -92,8 +108,54 @@ export async function createPipelineRun(
     .single()
 
   if (insertErr || !newRun) {
+    // Fallback: If unique constraint matched, update existing record instead of throwing error
+    const { data: fallbackExisting } = await supabase
+      .from('pipeline_runs')
+      .select('*')
+      .eq('repository_id', input.repositoryId)
+      .eq('commit_sha', input.commitSha)
+      .maybeSingle()
+
+    if (fallbackExisting) {
+      const { data: updated } = await supabase
+        .from('pipeline_runs')
+        .update({
+          status: 'queued',
+          current_stage: 'webhook',
+          queued_at: new Date().toISOString(),
+          started_at: null,
+          finished_at: null,
+          duration_ms: null,
+          error_message: null,
+          retry_count: (fallbackExisting.retry_count || 0) + 1,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', fallbackExisting.id)
+        .select('*')
+        .single()
+
+      if (updated) {
+        return updated as unknown as PipelineRun
+      }
+    }
+
     logger.error({ err: insertErr }, 'Failed to create pipeline run')
-    throw new HttpError(500, 'DB_ERROR', 'Failed to create pipeline run.')
+    throw new HttpError(500, 'DB_ERROR', `Failed to create pipeline run: ${insertErr?.message || 'DB Error'}`)
+  }
+
+  // Upsert into documentation_runs for backwards-compatible DB schemas
+  try {
+    await supabase.from('documentation_runs').upsert({
+      id: newRun.id,
+      repository_id: input.repositoryId,
+      triggered_by: input.triggeredBy ?? null,
+      trigger_type: input.triggerType ?? 'webhook',
+      commit_sha: input.commitSha,
+      branch: input.branch ?? 'main',
+      status: 'queued',
+    })
+  } catch {
+    // Optional fallback
   }
 
   // Log initial webhook stage
@@ -142,16 +204,36 @@ export async function updateStageProgress(
     updateData.started_at = new Date().toISOString()
   }
 
-  const { data: updated, error: updateErr } = await supabase
+  let { data: updated, error: updateErr } = await supabase
     .from('pipeline_runs')
     .update(updateData)
     .eq('id', input.runId)
     .select('*')
     .single()
 
+  // Fallback: If DB constraint on current_stage fails, retry updating status & error without stage field
+  if (updateErr) {
+    logger.warn({ err: updateErr, runId: input.runId, stage: input.stage }, 'Failed to update current_stage on pipeline_runs, attempting status fallback update')
+    const fallbackData = { ...updateData }
+    delete fallbackData.current_stage
+
+    const fallbackResult = await supabase
+      .from('pipeline_runs')
+      .update(fallbackData)
+      .eq('id', input.runId)
+      .select('*')
+      .single()
+
+    if (!fallbackResult.error && fallbackResult.data) {
+      updated = fallbackResult.data
+      updateErr = null
+    }
+  }
+
   if (updateErr || !updated) {
-    logger.error({ err: updateErr }, 'Failed to update stage progress')
-    throw new HttpError(500, 'DB_ERROR', 'Failed to update stage progress.')
+    logger.error({ err: updateErr, runId: input.runId }, 'Failed to update stage progress')
+    const detailMsg = updateErr?.message ? `: ${updateErr.message}` : ''
+    throw new HttpError(500, 'DB_ERROR', `Failed to update stage progress${detailMsg}`)
   }
 
   // Log stage transition
@@ -205,8 +287,9 @@ export async function completePipelineRun(
     .single()
 
   if (updateErr || !updated) {
-    logger.error({ err: updateErr }, 'Failed to complete pipeline run')
-    throw new HttpError(500, 'DB_ERROR', 'Failed to complete pipeline run.')
+    logger.error({ err: updateErr, runId: input.runId }, 'Failed to complete pipeline run')
+    const detailMsg = updateErr?.message ? `: ${updateErr.message}` : ''
+    throw new HttpError(500, 'DB_ERROR', `Failed to complete pipeline run${detailMsg}`)
   }
 
   // Log final stage completed

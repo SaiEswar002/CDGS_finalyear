@@ -11,6 +11,8 @@ import {
   getRepositoryCommitsHandler,
   getRepositoryTreeHandler,
   getRepositoryFileHandler,
+  triggerPipelineHandler,
+  triggerAllPipelinesHandler,
 } from './repositories.controller'
 import {
   getRepoDocVersionsHandler,
@@ -30,6 +32,12 @@ repositoriesRouter.use(authenticate)
 repositoriesRouter.post('/', validateImportBody, importRepositoryHandler)
 
 /**
+ * @route POST /api/v1/repositories/trigger-all
+ * @desc  Trigger pipeline runs for all user connected repositories
+ */
+repositoriesRouter.post('/trigger-all', triggerAllPipelinesHandler)
+
+/**
  * @route GET /api/v1/repositories
  * @desc  List imported repositories for the current user
  */
@@ -40,6 +48,12 @@ repositoriesRouter.get('/', listRepositoriesHandler)
  * @desc  Get a single repository by CDGS UUID
  */
 repositoriesRouter.get('/:id', validateRepoIdParam, getRepositoryHandler)
+
+/**
+ * @route POST /api/v1/repositories/:id/trigger-pipeline
+ * @desc  Trigger manual pipeline run for a repository (optionally for specific commit)
+ */
+repositoriesRouter.post('/:id/trigger-pipeline', validateRepoIdParam, triggerPipelineHandler)
 
 /**
  * @route GET /api/v1/repositories/:id/languages
@@ -88,4 +102,5 @@ repositoriesRouter.get('/:id/docs/versions/:versionId', validateRepoIdParam, get
  * @desc  Disconnect (delete local record only)
  */
 repositoriesRouter.delete('/:id', validateRepoIdParam, deleteRepositoryHandler)
+
 
