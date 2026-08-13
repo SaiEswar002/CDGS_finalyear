@@ -12,6 +12,11 @@ import {
   getRepositoryTreeHandler,
   getRepositoryFileHandler,
 } from './repositories.controller'
+import {
+  getRepoDocVersionsHandler,
+  getLatestRepoDocsHandler,
+  getDocVersionByIdHandler,
+} from './docgen.controller'
 
 export const repositoriesRouter = Router()
 
@@ -59,6 +64,24 @@ repositoriesRouter.get('/:id/tree', validateRepoIdParam, getRepositoryTreeHandle
  * @desc  Get file content
  */
 repositoriesRouter.get('/:id/file', validateRepoIdParam, getRepositoryFileHandler)
+
+/**
+ * @route GET /api/v1/repositories/:id/docs/versions
+ * @desc  List generated documentation version snapshots
+ */
+repositoriesRouter.get('/:id/docs/versions', validateRepoIdParam, getRepoDocVersionsHandler)
+
+/**
+ * @route GET /api/v1/repositories/:id/docs/latest
+ * @desc  Get latest generated documentation version and artifacts
+ */
+repositoriesRouter.get('/:id/docs/latest', validateRepoIdParam, getLatestRepoDocsHandler)
+
+/**
+ * @route GET /api/v1/repositories/:id/docs/versions/:versionId
+ * @desc  Get specific generated documentation version and artifacts
+ */
+repositoriesRouter.get('/:id/docs/versions/:versionId', validateRepoIdParam, getDocVersionByIdHandler)
 
 /**
  * @route DELETE /api/v1/repositories/:id

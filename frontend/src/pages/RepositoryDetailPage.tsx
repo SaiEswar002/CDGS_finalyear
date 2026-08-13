@@ -35,6 +35,24 @@ interface TreeItem {
   size?: number
 }
 
+interface DocVersionItem {
+  id: string
+  version_number: number
+  commit_sha: string
+  published_at: string
+  created_at: string
+}
+
+interface DocArtifactItem {
+  id: string
+  file_path: string
+  doc_type: string
+  title: string
+  content: string
+  token_count: number
+  model_used: string
+}
+
 const LANG_COLORS: Record<string, string> = {
   TypeScript: '#3178c6',
   JavaScript: '#f1e05a',
@@ -74,8 +92,8 @@ export default function RepositoryDetailPage() {
   const [deleting, setDeleting] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
 
-  // Tabs: 'tree' | 'commits' | 'languages'
-  const [activeTab, setActiveTab] = useState<'tree' | 'commits' | 'languages'>('tree')
+  // Tabs: 'tree' | 'commits' | 'languages' | 'docs'
+  const [activeTab, setActiveTab] = useState<'tree' | 'commits' | 'languages' | 'docs'>('tree')
 
   // Tab Data States
   const [languages, setLanguages] = useState<LanguageItem[]>([])
@@ -84,6 +102,13 @@ export default function RepositoryDetailPage() {
   const [tree, setTree] = useState<TreeItem[]>([])
   const [loadingTab, setLoadingTab] = useState(false)
   const [treeSearch, setTreeSearch] = useState('')
+
+  // Documentation States
+  const [docVersions, setDocVersions] = useState<DocVersionItem[]>([])
+  const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null)
+  const [docArtifacts, setDocArtifacts] = useState<DocArtifactItem[]>([])
+  const [selectedArtifactId, setSelectedArtifactId] = useState<string | null>(null)
+  const [loadingDocs, setLoadingDocs] = useState(false)
 
   // Directory navigation state
   const [currentDir, setCurrentDir] = useState<string>('')
@@ -123,16 +148,45 @@ export default function RepositoryDetailPage() {
 
   // 2. Fetch Tab Data helper
   const loadTabData = useCallback(
-    (tab: 'tree' | 'commits' | 'languages', force = false) => {
+    (tab: 'tree' | 'commits' | 'languages' | 'docs', force = false) => {
       if (!id) return
 
       if (!force) {
         if (tab === 'tree' && tree.length > 0) return
         if (tab === 'commits' && commits.length > 0) return
         if (tab === 'languages' && languages.length > 0) return
+        if (tab === 'docs' && docArtifacts.length > 0) return
       }
 
       setLoadingTab(true)
+      if (tab === 'docs') {
+        setLoadingDocs(true)
+        api
+          .get<{ success: boolean; data: { version: DocVersionItem | null; documents: DocArtifactItem[] } }>(
+            `/repositories/${id}/docs/latest`,
+          )
+          .then((res) => {
+            const version = res.data.data.version
+            const docs = res.data.data.documents ?? []
+            setDocArtifacts(docs)
+            if (version) {
+              setSelectedVersionId(version.id)
+              setDocVersions([version])
+            }
+            if (docs.length > 0) {
+              setSelectedArtifactId(docs[0].id)
+            }
+          })
+          .catch(() => {
+            toast.error('Failed to load generated documentation')
+          })
+          .finally(() => {
+            setLoadingTab(false)
+            setLoadingDocs(false)
+          })
+        return
+      }
+
       api
         .get<{ success: boolean; data: any }>(`/repositories/${id}/${tab}`)
         .then((res) => {
@@ -148,8 +202,13 @@ export default function RepositoryDetailPage() {
         })
         .finally(() => setLoadingTab(false))
     },
-    [id, tree.length, commits.length, languages.length],
+    [id, tree.length, commits.length, languages.length, docArtifacts.length],
   )
+
+  function handleTabChange(tab: 'tree' | 'commits' | 'languages' | 'docs') {
+    setActiveTab(tab)
+    loadTabData(tab)
+  }
 
   // Load tree and languages once repo is available
   useEffect(() => {
@@ -158,11 +217,6 @@ export default function RepositoryDetailPage() {
       loadTabData('languages')
     }
   }, [repo, id, loadTabData])
-
-  function handleTabChange(tab: 'tree' | 'commits' | 'languages') {
-    setActiveTab(tab)
-    loadTabData(tab)
-  }
 
   async function handleRefresh() {
     if (!id) return
@@ -412,6 +466,17 @@ export default function RepositoryDetailPage() {
         >
           <span>📊</span> Detailed Languages ({languages.length})
         </button>
+        <button
+          type="button"
+          onClick={() => handleTabChange('docs')}
+          className={`px-5 py-3 text-sm font-semibold border-b-2 transition-colors duration-150 flex items-center gap-2 ${
+            activeTab === 'docs'
+              ? 'border-brand-500 text-brand-300'
+              : 'border-transparent text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          <span>🧠</span> Generated Docs ({docArtifacts.length})
+        </button>
       </div>
 
       {/* Tab Contents */}
@@ -581,6 +646,146 @@ export default function RepositoryDetailPage() {
                   </a>
                 </div>
               ))}
+            </div>
+          )}
+        </div>
+      ) : activeTab === 'docs' ? (
+        /* 🧠 Generated Documentation View */
+        <div className="space-y-6">
+          {docVersions.length > 0 && (
+            <div className="flex items-center justify-between glass-card p-4">
+              <div className="flex items-center gap-3">
+                <span className="text-xs text-slate-400 font-medium">Documentation Version:</span>
+                <select
+                  value={selectedVersionId ?? ''}
+                  onChange={(e) => {
+                    const verId = e.target.value
+                    setSelectedVersionId(verId)
+                    if (id && verId) {
+                      setLoadingDocs(true)
+                      api
+                        .get<{ success: boolean; data: { version: DocVersionItem; documents: DocArtifactItem[] } }>(
+                          `/repositories/${id}/docs/versions/${verId}`,
+                        )
+                        .then((res) => {
+                          setDocArtifacts(res.data.data.documents ?? [])
+                          if (res.data.data.documents?.length > 0) {
+                            setSelectedArtifactId(res.data.data.documents[0].id)
+                          }
+                        })
+                        .finally(() => setLoadingDocs(false))
+                    }
+                  }}
+                  className="bg-slate-800 text-slate-200 text-xs rounded-lg px-3 py-1.5 border border-white/10 focus:outline-none focus:border-brand-500 font-mono"
+                >
+                  {docVersions.map((v) => (
+                    <option key={v.id} value={v.id}>
+                      Version {v.version_number} (sha: {v.commit_sha.slice(0, 7)}) — {new Date(v.created_at || v.published_at).toLocaleDateString()}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <button
+                type="button"
+                onClick={() => loadTabData('docs', true)}
+                className="btn-secondary text-xs py-1 px-3"
+              >
+                🔄 Refresh
+              </button>
+            </div>
+          )}
+
+          {loadingDocs ? (
+            <div className="flex justify-center py-20">
+              <div className="w-8 h-8 rounded-full border-2 border-brand-500 border-t-transparent animate-spin" />
+            </div>
+          ) : docArtifacts.length === 0 ? (
+            <div className="glass-card p-12 text-center">
+              <div className="w-12 h-12 mx-auto mb-4 rounded-full bg-brand-500/10 text-brand-400 flex items-center justify-center text-xl">
+                🧠
+              </div>
+              <h3 className="text-base font-semibold text-slate-200 mb-1">No Generated Documentation Yet</h3>
+              <p className="text-xs text-slate-400 max-w-md mx-auto mb-6">
+                Push code to this repository to automatically trigger Phase 3 change detection & Phase 4 documentation generation.
+              </p>
+              <button
+                type="button"
+                onClick={() => loadTabData('docs', true)}
+                className="btn-secondary text-xs inline-flex items-center gap-1.5"
+              >
+                🔄 Refresh Docs
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+              {/* Artifacts Sidebar */}
+              <div className="lg:col-span-1 space-y-2">
+                <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3 px-1">
+                  Generated Artifacts ({docArtifacts.length})
+                </h3>
+                {docArtifacts.map((art) => (
+                  <button
+                    key={art.id}
+                    type="button"
+                    onClick={() => setSelectedArtifactId(art.id)}
+                    className={`w-full text-left p-3 rounded-xl border text-xs transition-all ${
+                      selectedArtifactId === art.id
+                        ? 'bg-brand-500/10 border-brand-500/50 text-slate-100 font-medium shadow-sm'
+                        : 'glass-card border-white/5 text-slate-400 hover:text-slate-200 hover:border-white/10'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="font-mono text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-slate-800 text-brand-300">
+                        {art.doc_type}
+                      </span>
+                      {art.model_used && (
+                        <span className="text-[10px] text-slate-500">{art.model_used}</span>
+                      )}
+                    </div>
+                    <p className="font-medium truncate text-slate-200">{art.title || art.file_path}</p>
+                    <p className="text-[10px] text-slate-500 truncate mt-0.5 font-mono">{art.file_path}</p>
+                  </button>
+                ))}
+              </div>
+
+              {/* Artifact Viewer */}
+              <div className="lg:col-span-3">
+                {(() => {
+                  const selectedDoc = docArtifacts.find((d) => d.id === selectedArtifactId) ?? docArtifacts[0]
+                  if (!selectedDoc) return null
+                  return (
+                    <div className="glass-card p-6 border border-white/10">
+                      <div className="flex flex-wrap items-center justify-between gap-4 pb-4 mb-4 border-b border-white/10">
+                        <div>
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-xs font-semibold px-2 py-0.5 rounded bg-brand-500/20 text-brand-300 uppercase font-mono">
+                              {selectedDoc.doc_type}
+                            </span>
+                            <span className="text-xs text-slate-400 font-mono">{selectedDoc.file_path}</span>
+                          </div>
+                          <h2 className="text-lg font-bold text-slate-100">{selectedDoc.title}</h2>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              navigator.clipboard.writeText(selectedDoc.content)
+                              toast.success('Document copied to clipboard!')
+                            }}
+                            className="btn-secondary text-xs py-1.5 px-3"
+                          >
+                            📋 Copy Content
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="bg-slate-950 p-5 rounded-lg border border-slate-800 font-mono text-xs text-slate-200 overflow-x-auto whitespace-pre-wrap leading-relaxed max-h-[600px] overflow-y-auto">
+                        {selectedDoc.content}
+                      </div>
+                    </div>
+                  )
+                })()}
+              </div>
             </div>
           )}
         </div>

@@ -105,4 +105,14 @@ describe('Phase 4 Documentation Generation Engine', () => {
       expect(result.summaryText).toContain('`src/routes/user.ts` (modified)')
     })
   })
+
+  describe('Documentation API Routes', () => {
+    it('has handlers defined for version snapshots and artifact listing', async () => {
+      const { getRepoDocVersionsHandler, getLatestRepoDocsHandler, getDocVersionByIdHandler } = await import('../src/repositories/docgen.controller')
+      expect(getRepoDocVersionsHandler).toBeDefined()
+      expect(getLatestRepoDocsHandler).toBeDefined()
+      expect(getDocVersionByIdHandler).toBeDefined()
+    })
+  })
 })
+
