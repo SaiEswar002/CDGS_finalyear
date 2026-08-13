@@ -176,12 +176,15 @@ describe('POST /api/v1/auth/logout', () => {
     expect(res.body.success).toBe(true)
 
     // Cookie should be cleared (set with empty value / expired)
-    const cookies = res.headers['set-cookie'] as string[] | undefined
-    if (cookies) {
-      const tokenCookie = cookies.find((c) => c.startsWith('cdgs_token='))
-      expect(tokenCookie).toBeDefined()
-      expect(tokenCookie).toMatch(/Expires=Thu, 01 Jan 1970|Max-Age=0/i)
-    }
+    const rawCookies = res.headers['set-cookie']
+    const cookies = Array.isArray(rawCookies)
+      ? rawCookies
+      : typeof rawCookies === 'string'
+        ? [rawCookies]
+        : []
+    const tokenCookie = cookies.find((c) => c.startsWith('cdgs_token='))
+    expect(tokenCookie).toBeDefined()
+    expect(tokenCookie).toMatch(/Expires=Thu, 01 Jan 1970|Max-Age=0/i)
   })
 
   it('returns 401 when not authenticated', async () => {
