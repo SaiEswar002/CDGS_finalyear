@@ -12,9 +12,6 @@ import { logger } from '../logger'
  * Receives GitHub push events, verifies HMAC signature,
  * matches the repository to a CDGS-connected repository,
  * creates a pipeline run, and enqueues a BullMQ job.
- *
- * This is Hari's assigned Phase 3 module — implemented here
- * to enable full end-to-end testing.
  */
 export async function githubWebhookHandler(req: Request, res: Response): Promise<void> {
   // 1. Verify X-Hub-Signature-256 (HMAC-SHA256)
@@ -27,18 +24,24 @@ export async function githubWebhookHandler(req: Request, res: Response): Promise
     return
   }
 
-  // req.body is Buffer because of express.raw() on this route
-  const isValid = verifyGitHubSignature(req.body as Buffer, signature)
+  // Handle Buffer, string, or parsed JSON object
+  const isValid = verifyGitHubSignature(req.body, signature)
   if (!isValid) {
     logger.warn({ eventType }, 'Webhook signature verification failed')
     res.status(401).json({ success: false, error: 'Invalid webhook signature' })
     return
   }
 
-  // 2. Parse JSON body from raw Buffer
+  // 2. Parse JSON body safely
   let payload: GitHubPushPayload
   try {
-    payload = JSON.parse((req.body as Buffer).toString('utf8'))
+    if (Buffer.isBuffer(req.body)) {
+      payload = JSON.parse(req.body.toString('utf8'))
+    } else if (typeof req.body === 'object' && req.body !== null) {
+      payload = req.body as GitHubPushPayload
+    } else {
+      payload = JSON.parse(String(req.body))
+    }
   } catch (err) {
     logger.error({ err }, 'Failed to parse webhook payload JSON')
     res.status(400).json({ success: false, error: 'Invalid JSON payload' })
