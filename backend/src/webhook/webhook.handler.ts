@@ -80,8 +80,8 @@ export async function githubWebhookHandler(req: Request, res: Response): Promise
   const supabase = getSupabaseClient()
   const { data: repoRecord, error: repoErr } = await supabase
     .from('repositories')
-    .select('id, user_id, full_name')
-    .eq('github_id', githubRepositoryId)
+    .select('id, user_id, name, owner')
+    .eq('github_repo_id', githubRepositoryId)
     .maybeSingle()
 
   if (repoErr) {
