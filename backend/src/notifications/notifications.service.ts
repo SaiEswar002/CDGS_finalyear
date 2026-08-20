@@ -59,23 +59,28 @@ export async function listNotifications(
     query = query.eq('is_read', false)
   }
 
-  const { data, error } = await query
+  try {
+    const { data, error } = await query
 
-  if (error) {
-    logger.error({ err: error, userId }, 'Failed to fetch notifications')
-    throw new Error('Failed to fetch notifications')
-  }
+    if (error) {
+      logger.warn({ err: error, userId }, 'Failed to fetch notifications (table may be missing or unmigrated)')
+      return { notifications: [], unreadCount: 0 }
+    }
 
-  // Fetch unread count separately
-  const { count } = await supabase
-    .from('notifications')
-    .select('id', { count: 'exact', head: true })
-    .eq('user_id', userId)
-    .eq('is_read', false)
+    // Fetch unread count separately
+    const { count } = await supabase
+      .from('notifications')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .eq('is_read', false)
 
-  return {
-    notifications: data ?? [],
-    unreadCount: count ?? 0,
+    return {
+      notifications: data ?? [],
+      unreadCount: count ?? 0,
+    }
+  } catch (err) {
+    logger.warn({ err, userId }, 'listNotifications failed unexpectedly')
+    return { notifications: [], unreadCount: 0 }
   }
 }
 
@@ -86,20 +91,23 @@ export async function markNotificationsRead(
   userId: string,
   notificationId?: string,
 ): Promise<void> {
-  const supabase = getSupabaseClient()
+  try {
+    const supabase = getSupabaseClient()
 
-  let query = supabase
-    .from('notifications')
-    .update({ is_read: true })
-    .eq('user_id', userId)
+    let query = supabase
+      .from('notifications')
+      .update({ is_read: true })
+      .eq('user_id', userId)
 
-  if (notificationId) {
-    query = query.eq('id', notificationId)
-  }
+    if (notificationId) {
+      query = query.eq('id', notificationId)
+    }
 
-  const { error } = await query
-  if (error) {
-    logger.error({ err: error, userId, notificationId }, 'Failed to mark notifications as read')
-    throw new Error('Failed to mark notifications as read')
+    const { error } = await query
+    if (error) {
+      logger.warn({ err: error, userId, notificationId }, 'Failed to mark notifications as read')
+    }
+  } catch (err) {
+    logger.warn({ err, userId, notificationId }, 'markNotificationsRead failed unexpectedly')
   }
 }

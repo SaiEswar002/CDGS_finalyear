@@ -1,32 +1,131 @@
-import type { ParsedCodeFile, GeneratedDocument } from './docgen.types'
+import type { UniversalCodeModel } from './ucm.types'
+import type { GeneratedDocument } from './docgen.types'
 import { computeContentHash } from './parser.service'
 
 /**
- * Generates/updates OpenAPI 3.0 specification documentation artifact.
+ * Enhanced OpenAPI 3.0 Specification Generator.
+ * Fixes route path formatting (converts `:id` -> `{id}`), auto-generates parameters array,
+ * creates $ref component schemas for data models, and configures security schemes.
  */
 export function generateSwaggerDoc(
   repoName: string,
-  parsedFiles: ParsedCodeFile[],
+  ucm: UniversalCodeModel,
 ): GeneratedDocument | null {
-  const routes = parsedFiles.flatMap((f) => f.symbols.filter((s) => s.kind === 'route'))
-
-  if (routes.length === 0 && !parsedFiles.some((f) => f.hasSwaggerAnnotations)) {
+  if (ucm.routes.length === 0) {
     return null
   }
 
   const paths: Record<string, any> = {}
 
-  for (const route of routes) {
-    const parts = route.name.split(' ')
-    const method = (parts[0] || 'GET').toLowerCase()
-    const pathUrl = parts[1] || '/'
+  // 1. Build OpenAPI Component Schemas from detected Models & Entities
+  const schemas: Record<string, any> = {}
+  const models = ucm.entities.filter(
+    (e) => e.kind === 'model' || e.kind === 'entity' || e.kind === 'schema' || e.kind === 'interface'
+  )
 
-    if (!paths[pathUrl]) paths[pathUrl] = {}
-    paths[pathUrl][method] = {
-      summary: `Automated route: ${route.name}`,
+  for (const m of models) {
+    const properties: Record<string, any> = {}
+    if (m.fields && m.fields.length > 0) {
+      for (const f of m.fields) {
+        properties[f.name] = {
+          type: f.type === 'number' || f.type === 'int' || f.type === 'float' ? 'number' : f.type === 'boolean' ? 'boolean' : 'string',
+          description: f.description || `Field \`${f.name}\`.`,
+        }
+      }
+    } else {
+      properties['id'] = { type: 'string' }
+    }
+
+    schemas[m.name] = {
+      type: 'object',
+      properties,
+      description: m.description || `Data Model \`${m.name}\`.`,
+    }
+  }
+
+  // 2. Build Paths and Endpoints
+  for (const route of ucm.routes) {
+    let formattedPath = route.path
+    if (!formattedPath.startsWith('/')) formattedPath = `/${formattedPath}`
+    formattedPath = formattedPath
+      .replace(/:([A-Za-z0-9_]+)/g, '{$1}')
+      .replace(/<([^>]+)>/g, '{$1}')
+
+    const method = route.method.toLowerCase()
+
+    if (!paths[formattedPath]) {
+      paths[formattedPath] = {}
+    }
+
+    // Parameters array
+    const parameters: any[] = []
+    const paramMatches = formattedPath.match(/\{([^}]+)\}/g)
+    if (paramMatches) {
+      paramMatches.forEach((pm) => {
+        const pName = pm.replace(/[\{\}]/g, '')
+        parameters.push({
+          name: pName,
+          in: 'path',
+          required: true,
+          schema: { type: 'string' },
+          description: `Path parameter \`${pName}\`.`,
+        })
+      })
+    }
+
+    if (route.parameters) {
+      for (const p of route.parameters) {
+        if (p.in !== 'path') {
+          parameters.push({
+            name: p.name,
+            in: p.in || 'query',
+            required: p.required ?? false,
+            schema: { type: p.type === 'number' || p.type === 'integer' ? 'number' : 'string' },
+            description: p.description || `Parameter \`${p.name}\`.`,
+          })
+        }
+      }
+    }
+
+    // Response schema reference if matching model found
+    const matchingSchemaName = Object.keys(schemas).find((sName) =>
+      route.handlerName.toLowerCase().includes(sName.toLowerCase()) ||
+      route.path.toLowerCase().includes(sName.toLowerCase())
+    )
+
+    const responseSchema = matchingSchemaName
+      ? { $ref: `#/components/schemas/${matchingSchemaName}` }
+      : { type: 'object' }
+
+    paths[formattedPath][method] = {
+      summary: route.summary || `${route.method} ${formattedPath}`,
+      description: route.description || `Handler function: \`${route.handlerName}\` in \`${route.filePath}\`.`,
+      parameters: parameters.length > 0 ? parameters : undefined,
+      security: ucm.metadata.hasAuth ? [{ BearerAuth: [] }] : undefined,
       responses: {
-        '200': { description: 'Success' },
+        '200': {
+          description: 'Successful Response',
+          content: {
+            'application/json': {
+              schema: responseSchema,
+            },
+          },
+        },
+        '400': { description: 'Bad Request / Validation Error' },
+        '401': { description: 'Unauthorized / Missing Authentication Token' },
+        '500': { description: 'Internal Server Error' },
       },
+    }
+  }
+
+  // 3. Security Schemes if Auth is detected
+  const securitySchemes: Record<string, any> = {}
+  if (ucm.metadata.hasAuth) {
+    securitySchemes['BearerAuth'] = {
+      type: 'http',
+      scheme: 'bearer',
+      bearerFormat: 'JWT',
+      description: 'JWT Bearer Authentication Token',
     }
   }
 
@@ -35,9 +134,13 @@ export function generateSwaggerDoc(
     info: {
       title: `${repoName} API Documentation`,
       version: '1.0.0',
-      description: `Automated OpenAPI specification generated by CDGS.`,
+      description: `Automated OpenAPI specification generated by CDGS for ${ucm.metadata.projectType}.`,
     },
     paths,
+    components: {
+      schemas: Object.keys(schemas).length > 0 ? schemas : undefined,
+      securitySchemes: Object.keys(securitySchemes).length > 0 ? securitySchemes : undefined,
+    },
   }
 
   const content = JSON.stringify(openApiSpec, null, 2)

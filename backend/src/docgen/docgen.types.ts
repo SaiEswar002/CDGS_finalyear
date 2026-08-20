@@ -1,8 +1,16 @@
 /**
- * Phase 4 Documentation Engine Types & Interfaces
+ * Documentation Engine Types & Interfaces
  */
 
-export type DocType = 'readme' | 'api' | 'module' | 'function' | 'class' | 'other'
+export type DocType =
+  | 'readme'
+  | 'api'
+  | 'module'
+  | 'function'
+  | 'class'
+  | 'database'
+  | 'architecture'
+  | 'other'
 
 /** Individual generated documentation file */
 export interface GeneratedDocument {
@@ -35,7 +43,7 @@ export interface ExtractedSymbol {
 /** Analyzed code file result */
 export interface ParsedCodeFile {
   filePath: string
-  language: 'typescript' | 'javascript' | 'python' | 'java' | 'go' | 'rust' | 'csharp' | 'cpp' | 'sql' | 'markdown' | 'other'
+  language: string
   symbols: ExtractedSymbol[]
   hasSwaggerAnnotations: boolean
 }

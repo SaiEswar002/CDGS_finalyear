@@ -21,15 +21,20 @@ import { logger } from '../logger'
  * 7. Update stage = publish, complete pipeline run (status = success)
  * 8. ALWAYS cleanup workspace in finally block
  */
-export async function processPipelineJob(job: Job<DocumentationPipelineJob>): Promise<void> {
-  const data = job.data
+/**
+ * Core implementation for executing a DocumentationPipelineJob (works both via BullMQ worker & in-process fallback).
+ */
+export async function executePipelineJobDirectly(
+  data: DocumentationPipelineJob,
+  attemptsMade = 0,
+): Promise<void> {
   const runId = data.pipelineRunId
   // Parent workspace container: /tmp/cdgs-pipeline/<runId>/
   const workspacePath = getWorkspacePath(runId)
 
   logger.info(
-    { jobId: job.id, pipelineRunId: runId, repo: `${data.owner}/${data.repo}`, attemptsMade: job.attemptsMade },
-    'Processing DocumentationPipelineJob in worker',
+    { pipelineRunId: runId, repo: `${data.owner}/${data.repo}`, attemptsMade },
+    'Executing DocumentationPipelineJob',
   )
 
   try {
@@ -53,7 +58,7 @@ export async function processPipelineJob(job: Job<DocumentationPipelineJob>): Pr
       runId,
       stage: 'clone',
       status: 'running',
-      retryCount: job.attemptsMade,
+      retryCount: attemptsMade,
     })
 
     // 3. Checkout repository into namespaced isolated workspace
@@ -134,7 +139,7 @@ export async function processPipelineJob(job: Job<DocumentationPipelineJob>): Pr
     )
   } catch (err: any) {
     const errorMessage = err.message || 'Worker pipeline job execution failed'
-    logger.error({ pipelineRunId: runId, err: errorMessage }, 'Pipeline run failed in worker')
+    logger.error({ pipelineRunId: runId, err: errorMessage }, 'Pipeline run failed')
 
     // Report failure to pipeline service (best-effort, do not throw)
     await completePipelineRun({
@@ -158,10 +163,16 @@ export async function processPipelineJob(job: Job<DocumentationPipelineJob>): Pr
       })
     }
 
-    throw err // Re-throw so BullMQ handles retry/attempts
+    throw err
   } finally {
     // ALWAYS cleanup workspace directory (§16)
-    // workspacePath is the parent container: /tmp/cdgs-pipeline/<runId>/
     await cleanupWorkspace(workspacePath).catch(() => {})
   }
+}
+
+/**
+ * Processes a DocumentationPipelineJob in the BullMQ worker.
+ */
+export async function processPipelineJob(job: Job<DocumentationPipelineJob>): Promise<void> {
+  return executePipelineJobDirectly(job.data, job.attemptsMade)
 }

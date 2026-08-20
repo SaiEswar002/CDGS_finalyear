@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import toast from 'react-hot-toast'
-import { api } from '../lib/api'
+import { api, getErrorMessage } from '../lib/api'
 
 export interface PipelineRunItem {
   id: string
@@ -73,8 +73,8 @@ export default function PipelineRunsTable() {
       const res = await api.post<{ success: boolean; message: string }>('/repositories/trigger-all')
       toast.success(res.data.message || 'Triggered pipeline runs for all repositories!')
       fetchRuns(true)
-    } catch (err: any) {
-      toast.error(err.response?.data?.error || 'Failed to trigger pipelines.')
+    } catch (err: unknown) {
+      toast.error(getErrorMessage(err, 'Failed to trigger pipelines.'))
     } finally {
       setTriggeringAll(false)
     }

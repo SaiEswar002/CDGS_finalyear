@@ -140,7 +140,10 @@ export async function createPipelineRun(
     }
 
     logger.error({ err: insertErr }, 'Failed to create pipeline run')
-    throw new HttpError(500, 'DB_ERROR', `Failed to create pipeline run: ${insertErr?.message || 'DB Error'}`)
+    const msg = insertErr?.code === 'PGRST205'
+      ? "Database table 'pipeline_runs' is missing. Please run migrations in Supabase SQL Editor (see db/migrations/apply_all_migrations.sql)."
+      : `Failed to create pipeline run: ${insertErr?.message || 'DB Error'}`
+    throw new HttpError(500, 'DB_ERROR', msg)
   }
 
   // Upsert into documentation_runs for backwards-compatible DB schemas

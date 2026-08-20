@@ -33,3 +33,24 @@ api.interceptors.response.use(
     return Promise.reject(error)
   },
 )
+
+/**
+ * Helper to safely extract error message from API response or Error object.
+ * Checks res.data.message (standard backend API error shape), res.data.error, err.message, or returns fallback.
+ */
+export function getErrorMessage(err: unknown, fallback: string = 'An unexpected error occurred'): string {
+  if (err && typeof err === 'object') {
+    const axiosErr = err as { response?: { data?: { message?: string; error?: string } }; message?: string }
+    if (axiosErr.response?.data?.message && typeof axiosErr.response.data.message === 'string') {
+      return axiosErr.response.data.message
+    }
+    if (axiosErr.response?.data?.error && typeof axiosErr.response.data.error === 'string') {
+      return axiosErr.response.data.error
+    }
+    if (axiosErr.message && typeof axiosErr.message === 'string') {
+      return axiosErr.message
+    }
+  }
+  return fallback
+}
+

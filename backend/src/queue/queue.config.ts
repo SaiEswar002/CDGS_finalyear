@@ -9,6 +9,7 @@ export function createRedisConnection(): Redis {
   const connection = new Redis(config.redis.url, {
     maxRetriesPerRequest: null, // Required by BullMQ
     enableReadyCheck: false,
+    connectTimeout: 5000,
     retryStrategy(times) {
       const delay = Math.min(times * 500, 5000)
       logger.warn({ times, delay }, 'Reconnecting to Redis...')

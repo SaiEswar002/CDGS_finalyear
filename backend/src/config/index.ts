@@ -71,6 +71,7 @@ const envSchema = z.object({
 
   // AI Providers (used in later phases)
   OPENAI_API_KEY: z.string().default(''),
+  OPENAI_DOCUMENTATION_MODEL: z.string().default('gpt-4o'),
   ANTHROPIC_API_KEY: z.string().default(''),
 
   // CORS / Frontend
@@ -144,6 +145,7 @@ export const config = {
 
   ai: {
     openaiApiKey: parsed.OPENAI_API_KEY,
+    openaiModel: parsed.OPENAI_DOCUMENTATION_MODEL,
     anthropicApiKey: parsed.ANTHROPIC_API_KEY,
   },
 

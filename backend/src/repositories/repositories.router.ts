@@ -18,6 +18,8 @@ import {
   getRepoDocVersionsHandler,
   getLatestRepoDocsHandler,
   getDocVersionByIdHandler,
+  downloadLatestDocPdfHandler,
+  downloadVersionDocPdfHandler,
 } from './docgen.controller'
 
 export const repositoriesRouter = Router()
@@ -80,16 +82,28 @@ repositoriesRouter.get('/:id/tree', validateRepoIdParam, getRepositoryTreeHandle
 repositoriesRouter.get('/:id/file', validateRepoIdParam, getRepositoryFileHandler)
 
 /**
- * @route GET /api/v1/repositories/:id/docs/versions
- * @desc  List generated documentation version snapshots
+ * @route GET /api/v1/repositories/:id/docs/latest/pdf
+ * @desc  Export latest generated documentation snapshot as PDF
  */
-repositoriesRouter.get('/:id/docs/versions', validateRepoIdParam, getRepoDocVersionsHandler)
+repositoriesRouter.get('/:id/docs/latest/pdf', validateRepoIdParam, downloadLatestDocPdfHandler)
 
 /**
  * @route GET /api/v1/repositories/:id/docs/latest
  * @desc  Get latest generated documentation version and artifacts
  */
 repositoriesRouter.get('/:id/docs/latest', validateRepoIdParam, getLatestRepoDocsHandler)
+
+/**
+ * @route GET /api/v1/repositories/:id/docs/versions
+ * @desc  List generated documentation version snapshots
+ */
+repositoriesRouter.get('/:id/docs/versions', validateRepoIdParam, getRepoDocVersionsHandler)
+
+/**
+ * @route GET /api/v1/repositories/:id/docs/versions/:versionId/pdf
+ * @desc  Export specific generated documentation version snapshot as PDF
+ */
+repositoriesRouter.get('/:id/docs/versions/:versionId/pdf', validateRepoIdParam, downloadVersionDocPdfHandler)
 
 /**
  * @route GET /api/v1/repositories/:id/docs/versions/:versionId

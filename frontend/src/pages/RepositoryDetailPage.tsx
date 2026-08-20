@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
-import { api } from '../lib/api'
+import { api, getErrorMessage } from '../lib/api'
 import type { Repository } from '../components/RepositoryCard'
 import FileViewerModal from '../components/FileViewerModal'
 
@@ -136,6 +136,8 @@ export default function RepositoryDetailPage() {
   const [docArtifacts, setDocArtifacts] = useState<DocArtifactItem[]>([])
   const [selectedArtifactId, setSelectedArtifactId] = useState<string | null>(null)
   const [loadingDocs, setLoadingDocs] = useState(false)
+  const [docsSearchQuery, setDocsSearchQuery] = useState('')
+  const [exportingPdf, setExportingPdf] = useState(false)
 
   // Pipeline Runs States
   const [pipelineRuns, setPipelineRuns] = useState<PipelineRunItem[]>([])
@@ -300,8 +302,8 @@ export default function RepositoryDetailPage() {
         }),
       ])
       toast.success('Repository data refreshed from GitHub!')
-    } catch {
-      toast.error('Failed to refresh repository data.')
+    } catch (err: unknown) {
+      toast.error(getErrorMessage(err, 'Failed to refresh repository data.'))
     } finally {
       setRefreshing(false)
     }
@@ -316,8 +318,8 @@ export default function RepositoryDetailPage() {
       await api.delete(`/repositories/${repo.id}`)
       toast.success(`${repo.full_name} disconnected.`)
       navigate('/repositories')
-    } catch {
-      toast.error('Failed to disconnect repository.')
+    } catch (err: unknown) {
+      toast.error(getErrorMessage(err, 'Failed to disconnect repository.'))
       setDeleting(false)
     }
   }
@@ -334,10 +336,61 @@ export default function RepositoryDetailPage() {
       setTimeout(() => {
         loadTabData('docs', true)
       }, 2500)
-    } catch (err: any) {
-      toast.error(err.response?.data?.error || 'Failed to trigger pipeline run.')
+    } catch (err: unknown) {
+      toast.error(getErrorMessage(err, 'Failed to trigger pipeline run.'))
     } finally {
       setActiveTriggerSha(null)
+    }
+  }
+
+  async function handleExportPdf() {
+    if (!id) return
+    if (docArtifacts.length === 0) {
+      toast.error('No generated documentation available yet. Please click "Run Pipeline & Build Docs" first.')
+      return
+    }
+
+    setExportingPdf(true)
+    const toastId = toast.loading('Generating professional PDF documentation report...')
+    try {
+      const endpoint = selectedVersionId
+        ? `/repositories/${id}/docs/versions/${selectedVersionId}/pdf`
+        : `/repositories/${id}/docs/latest/pdf`
+
+      const response = await api.get(endpoint, {
+        responseType: 'blob',
+        timeout: 120_000, // 2-minute timeout for PDF generation
+      })
+
+      const blob = new Blob([response.data], { type: 'application/pdf' })
+      const url = window.URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      const safeRepoName = (repo?.name || 'repository').replace(/[^a-zA-Z0-9_-]/g, '_')
+      link.setAttribute('download', `${safeRepoName}-documentation.pdf`)
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      window.URL.revokeObjectURL(url)
+
+      toast.success('PDF report exported and downloaded successfully!', { id: toastId })
+    } catch (err: any) {
+      let errMsg = 'Failed to export PDF documentation report'
+      if (err?.response?.data instanceof Blob) {
+        try {
+          const blobText = await err.response.data.text()
+          const json = JSON.parse(blobText)
+          if (json.error) errMsg = json.error
+          else if (json.message) errMsg = json.message
+        } catch {
+          // ignore parsing error
+        }
+      } else {
+        errMsg = getErrorMessage(err, errMsg)
+      }
+      toast.error(errMsg, { id: toastId })
+    } finally {
+      setExportingPdf(false)
     }
   }
 
@@ -809,13 +862,25 @@ export default function RepositoryDetailPage() {
                   ))}
                 </select>
               </div>
-              <button
-                type="button"
-                onClick={() => loadTabData('docs', true)}
-                className="btn-secondary text-xs py-1 px-3"
-              >
-                🔄 Refresh
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  disabled={exportingPdf}
+                  onClick={() => { void handleExportPdf() }}
+                  className="btn-primary text-xs py-1.5 px-3 flex items-center gap-1.5 disabled:opacity-50"
+                  title="Export complete documentation snapshot as professional PDF"
+                >
+                  <span className={exportingPdf ? 'animate-spin inline-block' : ''}>📄</span>
+                  {exportingPdf ? 'Exporting PDF…' : 'Export PDF'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => loadTabData('docs', true)}
+                  className="btn-secondary text-xs py-1.5 px-3"
+                >
+                  🔄 Refresh
+                </button>
+              </div>
             </div>
           )}
 
@@ -855,32 +920,72 @@ export default function RepositoryDetailPage() {
             <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
               {/* Artifacts Sidebar */}
               <div className="lg:col-span-1 space-y-2">
-                <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3 px-1">
-                  Generated Artifacts ({docArtifacts.length})
+                <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 px-1 flex items-center justify-between">
+                  <span>Generated Artifacts</span>
+                  <span className="px-2 py-0.5 rounded-full bg-brand-500/20 text-brand-300 font-mono text-[10px]">
+                    {docArtifacts.length}
+                  </span>
                 </h3>
-                {docArtifacts.map((art) => (
-                  <button
-                    key={art.id}
-                    type="button"
-                    onClick={() => setSelectedArtifactId(art.id)}
-                    className={`w-full text-left p-3 rounded-xl border text-xs transition-all ${
-                      selectedArtifactId === art.id
-                        ? 'bg-brand-500/10 border-brand-500/50 text-slate-100 font-medium shadow-sm'
-                        : 'glass-card border-white/5 text-slate-400 hover:text-slate-200 hover:border-white/10'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between mb-1.5">
-                      <span className="font-mono text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-slate-800 text-brand-300">
-                        {art.doc_type}
-                      </span>
-                      {art.model_used && (
-                        <span className="text-[10px] text-slate-500">{art.model_used}</span>
-                      )}
-                    </div>
-                    <p className="font-medium truncate text-slate-200">{art.title || art.file_path}</p>
-                    <p className="text-[10px] text-slate-500 truncate mt-0.5 font-mono">{art.file_path}</p>
-                  </button>
-                ))}
+
+                {/* Instant Search Bar */}
+                <div className="mb-3">
+                  <input
+                    type="text"
+                    placeholder="🔍 Filter artifacts..."
+                    value={docsSearchQuery}
+                    onChange={(e) => setDocsSearchQuery(e.target.value)}
+                    className="w-full bg-slate-900 text-slate-200 text-xs rounded-xl px-3 py-2 border border-slate-700/60 focus:outline-none focus:border-brand-500 font-mono"
+                  />
+                </div>
+
+                {docArtifacts
+                  .filter((art) => {
+                    if (!docsSearchQuery.trim()) return true
+                    const q = docsSearchQuery.toLowerCase()
+                    return (
+                      art.title.toLowerCase().includes(q) ||
+                      art.file_path.toLowerCase().includes(q) ||
+                      art.doc_type.toLowerCase().includes(q)
+                    )
+                  })
+                  .map((art) => {
+                    const badgeColor =
+                      art.file_path === 'docs/quality.md'
+                        ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30'
+                        : art.doc_type === 'readme'
+                        ? 'bg-blue-500/20 text-blue-300 border-blue-500/30'
+                        : art.doc_type === 'architecture'
+                        ? 'bg-purple-500/20 text-purple-300 border-purple-500/30'
+                        : art.doc_type === 'api'
+                        ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+                        : art.doc_type === 'database'
+                        ? 'bg-rose-500/20 text-rose-300 border-rose-500/30'
+                        : 'bg-amber-500/20 text-amber-300 border-amber-500/30'
+
+                    return (
+                      <button
+                        key={art.id}
+                        type="button"
+                        onClick={() => setSelectedArtifactId(art.id)}
+                        className={`w-full text-left p-3 rounded-xl border text-xs transition-all ${
+                          selectedArtifactId === art.id
+                            ? 'bg-brand-500/10 border-brand-500/50 text-slate-100 font-medium shadow-sm ring-1 ring-brand-500/30'
+                            : 'glass-card border-white/5 text-slate-400 hover:text-slate-200 hover:border-white/10'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between mb-1.5">
+                          <span className={`font-mono text-[10px] uppercase tracking-wider px-2 py-0.5 rounded border ${badgeColor}`}>
+                            {art.doc_type}
+                          </span>
+                          {art.model_used && (
+                            <span className="text-[10px] text-slate-500 truncate max-w-[100px]">{art.model_used}</span>
+                          )}
+                        </div>
+                        <p className="font-medium truncate text-slate-200">{art.title || art.file_path}</p>
+                        <p className="text-[10px] text-slate-500 truncate mt-0.5 font-mono">{art.file_path}</p>
+                      </button>
+                    )
+                  })}
               </div>
 
               {/* Artifact Viewer */}
@@ -888,12 +993,24 @@ export default function RepositoryDetailPage() {
                 {(() => {
                   const selectedDoc = docArtifacts.find((d) => d.id === selectedArtifactId) ?? docArtifacts[0]
                   if (!selectedDoc) return null
+
+                  const badgeColor =
+                    selectedDoc.doc_type === 'readme'
+                      ? 'bg-blue-500/20 text-blue-300 border-blue-500/30'
+                      : selectedDoc.doc_type === 'architecture'
+                      ? 'bg-purple-500/20 text-purple-300 border-purple-500/30'
+                      : selectedDoc.doc_type === 'api'
+                      ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+                      : selectedDoc.doc_type === 'database'
+                      ? 'bg-rose-500/20 text-rose-300 border-rose-500/30'
+                      : 'bg-amber-500/20 text-amber-300 border-amber-500/30'
+
                   return (
                     <div className="glass-card p-6 border border-white/10">
                       <div className="flex flex-wrap items-center justify-between gap-4 pb-4 mb-4 border-b border-white/10">
                         <div>
                           <div className="flex items-center gap-2 mb-1">
-                            <span className="text-xs font-semibold px-2 py-0.5 rounded bg-brand-500/20 text-brand-300 uppercase font-mono">
+                            <span className={`text-xs font-semibold px-2.5 py-0.5 rounded border uppercase font-mono ${badgeColor}`}>
                               {selectedDoc.doc_type}
                             </span>
                             <span className="text-xs text-slate-400 font-mono">{selectedDoc.file_path}</span>
@@ -903,18 +1020,27 @@ export default function RepositoryDetailPage() {
                         <div className="flex items-center gap-2">
                           <button
                             type="button"
+                            disabled={exportingPdf}
+                            onClick={() => { void handleExportPdf() }}
+                            className="btn-primary text-xs py-1.5 px-3 flex items-center gap-1.5 disabled:opacity-50"
+                          >
+                            <span className={exportingPdf ? 'animate-spin inline-block' : ''}>📄</span>
+                            {exportingPdf ? 'Exporting PDF…' : 'Export PDF'}
+                          </button>
+                          <button
+                            type="button"
                             onClick={() => {
                               navigator.clipboard.writeText(selectedDoc.content)
                               toast.success('Document copied to clipboard!')
                             }}
-                            className="btn-secondary text-xs py-1.5 px-3"
+                            className="btn-secondary text-xs py-1.5 px-3 flex items-center gap-1.5"
                           >
-                            📋 Copy Content
+                            <span>📋</span> Copy Content
                           </button>
                         </div>
                       </div>
 
-                      <div className="bg-slate-950 p-5 rounded-lg border border-slate-800 font-mono text-xs text-slate-200 overflow-x-auto whitespace-pre-wrap leading-relaxed max-h-[600px] overflow-y-auto">
+                      <div className="bg-slate-950 p-5 rounded-lg border border-slate-800 font-mono text-xs text-slate-200 overflow-x-auto whitespace-pre-wrap leading-relaxed max-h-[650px] overflow-y-auto">
                         {selectedDoc.content}
                       </div>
                     </div>
